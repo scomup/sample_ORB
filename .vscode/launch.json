@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}//test/03_test_initializer/build/test_initializer",
+            "program": "${workspaceRoot}//test/05_test_mappoint/build/test_mappoint",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
