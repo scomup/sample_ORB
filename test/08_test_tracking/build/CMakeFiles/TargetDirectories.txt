@@ -1,3 +1,0 @@
-/home/liu/workspace/sample_ORB/test/08_test_tracking/build/CMakeFiles/edit_cache.dir
-/home/liu/workspace/sample_ORB/test/08_test_tracking/build/CMakeFiles/rebuild_cache.dir
-/home/liu/workspace/sample_ORB/test/08_test_tracking/build/CMakeFiles/test_tracking.dir

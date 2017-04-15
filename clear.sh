@@ -37,3 +37,13 @@ echo "Cleaning test 07 ..."
 cd test/07_test_poseOptimizer
 rm -rf build
 cd ../../
+
+echo "Cleaning test 08 ..."
+cd test/08_test_tracking
+rm -rf build
+cd ../../
+
+echo "Cleaning g2o ..."
+cd Thirdparty/g2o
+rm -rf build
+cd ../../
