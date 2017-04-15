@@ -25,7 +25,8 @@
 #include "Frame.h"
 
 #include <mutex>
-
+#include <set>
+#include <map>
 
 namespace sample_ORB
 {

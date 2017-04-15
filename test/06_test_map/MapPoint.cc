@@ -211,9 +211,24 @@ void MapPoint::UpdateNormalAndDepth()
     }
 }
 
+bool MapPoint::isBad()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    std::unique_lock<std::mutex> lock2(mMutexPos);
+    return mbBad;
+}
 
+std::map<KeyFrame*, size_t> MapPoint::GetObservations()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return mObservations;
+}
 
-
+cv::Mat MapPoint::GetWorldPos()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return mWorldPos.clone();
+}
 
 /*
 
@@ -224,11 +239,6 @@ void MapPoint::SetWorldPos(const cv::Mat &Pos)
     Pos.copyTo(mWorldPos);
 }
 
-cv::Mat MapPoint::GetWorldPos()
-{
-    std::unique_lock<std::mutex> lock(mMutexPos);
-    return mWorldPos.clone();
-}
 
 cv::Mat MapPoint::GetNormal()
 {
@@ -270,11 +280,6 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
         SetBadFlag();
 }
 
-std::map<KeyFrame*, size_t> MapPoint::GetObservations()
-{
-    std::unique_lock<std::mutex> lock(mMutexFeatures);
-    return mObservations;
-}
 
 int MapPoint::Observations()
 {
@@ -348,12 +353,6 @@ void MapPoint::Replace(MapPoint* pMP)
     mpMap->EraseMapPoint(this);
 }
 
-bool MapPoint::isBad()
-{
-    std::unique_lock<std::mutex> lock(mMutexFeatures);
-    std::unique_lock<std::mutex> lock2(mMutexPos);
-    return mbBad;
-}
 
 void MapPoint::IncreaseVisible(int n)
 {

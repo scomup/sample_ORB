@@ -1,4 +1,5 @@
 #include <opencv2/core/core.hpp>
+#include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include "ORBextractor.h"
 
@@ -9,8 +10,6 @@ using namespace cv;
 using namespace sample_ORB;
 int main()
 {
-	std::cout << "== Color image ==" << std::endl;
-
 	Mat input,output;
 	input = imread(filename_test);
     if(input.empty())

@@ -28,6 +28,7 @@
 #include <vector>
 #include <list>
 #include <set>
+#include <map>
 
 #include<opencv2/core/core.hpp>
 #include<mutex>
@@ -48,15 +49,15 @@ public:
     void AddObservation(KeyFrame* pKF,size_t idx);
     void ComputeDistinctiveDescriptors();
     void UpdateNormalAndDepth();
-
+    bool isBad();
+    std::map<KeyFrame*,size_t> GetObservations();
+    cv::Mat GetWorldPos();
 /*
     void SetWorldPos(const cv::Mat &Pos);
-    cv::Mat GetWorldPos();
 
     cv::Mat GetNormal();
     KeyFrame* GetReferenceKeyFrame();
 
-    std::map<KeyFrame*,size_t> GetObservations();
     int Observations();
 
     void EraseObservation(KeyFrame* pKF);
@@ -65,7 +66,6 @@ public:
     bool IsInKeyFrame(KeyFrame* pKF);
 
     void SetBadFlag();
-    bool isBad();
 
     void Replace(MapPoint* pMP);    
     MapPoint* GetReplaced();

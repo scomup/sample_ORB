@@ -4,20 +4,39 @@
 
 #include <mutex>
 #include <opencv2/core/core.hpp>
+#include <pangolin/pangolin.h>
 
-class PointDrawer
+#include "Map.h"
+namespace sample_ORB
+{
+
+class Drawer
 {
 public:
-    PointDrawer();
+    Drawer(Map *pMap);
 
     void Run();
-    void update(std::vector<cv::Point3f> p3d);
+    void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
+    void DrawMapPoints();
+    void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
+    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
+    void SetCameraPose(cv::Mat& CameraPose);
+
 
 private:
-    std::vector<cv::Point3f> mP3ds;
+    Map* mpMap; 
     std::mutex mTx_;
+    std::mutex mMutexCamera;
+    float mKeyFrameSize;
+    float mKeyFrameLineWidth;
+    float mGraphLineWidth;
+    float mPointSize;
+    float mCameraSize;
+    float mCameraLineWidth;
+    cv::Mat mCameraPose;
+
 };
 
-
+}
 #endif 
 	

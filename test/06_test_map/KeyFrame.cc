@@ -28,7 +28,7 @@ namespace sample_ORB
 
 long unsigned int KeyFrame::nNextId=0;
 
-KeyFrame::KeyFrame(Frame &F, Map *pMap = nullptr):
+KeyFrame::KeyFrame(Frame &F, Map *pMap):
     mnFrameId(F.mnId),  
     mTimeStamp(F.mTimeStamp), 
     mnGridCols(FRAME_GRID_COLS), 
@@ -65,8 +65,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap = nullptr):
     mpParent(NULL),
     //mbNotErase(false),
     //mbToBeErased(false), 
-    mbBad(false) 
-    //mpMap(pMap)
+    mbBad(false),
+    mpMap(pMap)
 {
     mnId=nNextId++;
 
@@ -165,6 +165,11 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
     UpdateBestCovisibles();
 }
 
+KeyFrame* KeyFrame::GetParent()
+{
+    unique_lock<mutex> lockCon(mMutexConnections);
+    return mpParent;
+}
 
 void KeyFrame::UpdateConnections()
 {
@@ -257,6 +262,46 @@ void KeyFrame::UpdateConnections()
 
     }
 }
+
+void KeyFrame::UpdateBestCovisibles()
+{
+    unique_lock<mutex> lock(mMutexConnections);
+    vector<pair<int,KeyFrame*> > vPairs;
+    vPairs.reserve(mConnectedKeyFrameWeights.size());
+    for(map<KeyFrame*,int>::iterator mit=mConnectedKeyFrameWeights.begin(), mend=mConnectedKeyFrameWeights.end(); mit!=mend; mit++)
+       vPairs.push_back(make_pair(mit->second,mit->first));
+
+    sort(vPairs.begin(),vPairs.end());
+    list<KeyFrame*> lKFs;
+    list<int> lWs;
+    for(size_t i=0, iend=vPairs.size(); i<iend;i++)
+    {
+        lKFs.push_front(vPairs[i].second);
+        lWs.push_front(vPairs[i].first);
+    }
+
+    mvpOrderedConnectedKeyFrames = vector<KeyFrame*>(lKFs.begin(),lKFs.end());
+    mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());    
+}
+
+vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
+{
+    unique_lock<mutex> lock(mMutexConnections);
+
+    if(mvpOrderedConnectedKeyFrames.empty())
+        return vector<KeyFrame*>();
+
+    vector<int>::iterator it = upper_bound(mvOrderedWeights.begin(),mvOrderedWeights.end(),w,KeyFrame::weightComp);
+    if(it==mvOrderedWeights.end())
+        return vector<KeyFrame*>();
+    else
+    {
+        int n = it-mvOrderedWeights.begin();
+        return vector<KeyFrame*>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin()+n);
+    }
+}
+
+
 
 
 

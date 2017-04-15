@@ -68,6 +68,7 @@ int main()
 
     Initializer initializer =  Initializer(frame1,1.0,200);
     Map map;
+
     if(initializer.Initialize(frame2, vnMatches12, Rcw, tcw, vIniP3D, vbTriangulated)){
         printf("Intialized!(%d)\n", n);
 
@@ -81,6 +82,10 @@ int main()
         printf("Create New KeyFrame\n");
         KeyFrame* pKFini = new KeyFrame(frame1, &map);
         KeyFrame* pKFcur = new KeyFrame(frame2, &map);
+
+        // Insert KFs in the map
+        map.AddKeyFrame(pKFini);
+        map.AddKeyFrame(pKFcur);
 
         for (size_t i = 0; i < vnMatches12.size(); i++)
         {
@@ -113,8 +118,10 @@ int main()
         pKFini->UpdateConnections();
         pKFcur->UpdateConnections();
 
-        PointDrawer drawer;
-        drawer.update(vIniP3D);
+        cout << "New Map created with " << map.MapPointsInMap() << " points" << endl;
+
+        Drawer drawer(&map);
+        drawer.SetCameraPose(frame2.mTcw);
         drawer.Run();
     }
     else{

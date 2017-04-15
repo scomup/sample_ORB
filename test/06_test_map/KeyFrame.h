@@ -23,10 +23,11 @@
 
 #include "ORBextractor.h"
 #include "Frame.h"
-#include"Map.h"
+#include "Map.h"
 
 #include <mutex>
-
+#include <set>
+#include <map>
 
 namespace sample_ORB
 {
@@ -56,16 +57,24 @@ public:
     void AddConnection(KeyFrame* pKF, const int &weight);
     //void EraseConnection(KeyFrame* pKF);
     void UpdateConnections();
+    void UpdateBestCovisibles();
+    std::vector<KeyFrame*> GetCovisiblesByWeight(const int &w);
 
     // Spanning tree functions
     void AddChild(KeyFrame* pKF);
     void EraseChild(KeyFrame* pKF);
+    KeyFrame* GetParent();
 
 
     // MapPoint observation functions
     void AddMapPoint(MapPoint* pMP, const size_t &idx);
 
-    // The following variables are accesed from only 1 thread or never change (no mutex needed).
+
+    static bool weightComp( int a, int b){
+        return a>b;
+    }
+
+
 public:
     static long unsigned int nNextId;
     long unsigned int mnId;
@@ -146,7 +155,7 @@ protected:
     //bool mbToBeErased;
     bool mbBad;    
 
-    //Map* mpMap;
+    Map* mpMap;
 
     std::mutex mMutexPose;
     std::mutex mMutexConnections;
