@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}//test/06_test_map/build/test_map",
+            "program": "${workspaceRoot}//test/07_test_poseOptimizer/build/test_poseOptimizer",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

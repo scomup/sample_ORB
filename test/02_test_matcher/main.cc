@@ -6,8 +6,11 @@
 #include "ORBmatcher.h"
 
 #include <iostream>
-const char filename_test1[] = "/home/liu/workspace/sample_ORB/data/left1.png"; 
-const char filename_test2[] = "/home/liu/workspace/sample_ORB/data/right1.png"; 
+//const char filename_test1[] = "/home/liu/workspace/sample_ORB/data/left1.png"; 
+//const char filename_test2[] = "/home/liu/workspace/sample_ORB/data/right1.png"; 
+
+const char filename_test1[] = "/home/liu/workspace/sample_ORB/data/frame0015.jpg";
+const char filename_test2[] = "/home/liu/workspace/sample_ORB/data/frame0018.jpg";
 
 using namespace cv;
 using namespace sample_ORB;

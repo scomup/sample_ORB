@@ -1,23 +1,28 @@
 ### Lesson00: 00_test_orbextractor
-This lesson introduces the orbextractor module for ORB_SLAM2(feature/keypoint extractor) and How does it Work.
+This lesson introduces the orbextractor module for ORB_SLAM2(feature/keypoint extractor) and how does it Work.
 
 ### Lesson01: 01_test_frame
-This lesson introduces the Frame module. A Frame contained all keypoints, All keypoints are saved in differnet grids for high-speed access. The camera information also saved for each Frame.
+This lesson introduces the Frame module. A Frame contained all keypoints, keypoints are saved in differnet grids for high-speed access. The camera information also be saved in Frame.
 
 ### Lesson02: 02_test_matcher
-This lesson introduces the Matcher module. The Matcher module responsible for find matched keypoints for 2 frame by different method. The original ORB_SLAM2 uses matching method including: Searching Nearby, Projection and Bag of words. at here we only implement Searching Nearby.
+This lesson introduces the Matcher module. The Matcher module responsible for find matched keypoints for 2 frame use different method. The original ORB_SLAM2 uses matching method including: Searching Nearby, Searching by Projection and Searching by Bag of words. at here we only implement Searching Nearby.
 
 ### Lesson03: 03_test_initializer
-This lesson introduces the initializer module. ORB_SLAM2 RANSAC finds homography and fundamental matrix separately. and chooses better one to reconstituted the 3d position for keypoints.
+This lesson introduces the initializer module. ORB_SLAM2 uses RANSAC to find homography and fundamental matrix separately. and chooses better one to reconstituted 3d position of the keypoints.
 
 ### Lesson04: 04_test_keyframe
-We will use 3 lesson to build completed map(Lesson04~06). basicly a completed map include map, keyframe and mappoint. at lesson4, we talk about the keyframe module first. A keyframe is choiced by certain rule from frames. ORB_SLAM2 access mappoint through keyframe, instead access them directly. 
+We will use 3 lesson to build completed map(Lesson04~06). basicly a completed map module is composed of 3 sub-modules: map, keyframe and mappoint. at lesson4, we talk about the keyframe module first. A keyframe is choiced by certain rule from frames. ORB_SLAM2 access mappoint through keyframe, instead of access them directly. 
 
 ### Lesson05: 05_test_mappoint
-At lesson5, we talk about the mappoint. mappoint is the basic element for the map of ORB_SLAM2. MapPoint is a landmark in real environment, help us make sure the pose of camera. Mappoint must have a 3d coordinate for image projection, and a descriptor for find a matching keypoint in image.
+At lesson5, we talk about the mappoint. mappoint is the basic element for the map of ORB_SLAM2. MapPoint is a landmark in real environment, help us compute the pose of camera. Mappoint must have a 3d coordinate to image projection, and a descriptor in order to find a matching keypoint in image.
 
 ### Lesson06: 06_test_map
-Finally we will build a completed map at lesson6
+Finally we will build a completed map at lesson6.　A module for Visualization also be implemented in this lesson.
+
+### Lesson07: 07_test_poseOptimizer
+Once ORB_SLAM2 create map, The Optimizer is used to minimized the projection error to find current camera pose. 
+
+
 
 
 

@@ -10,6 +10,7 @@
         "cstring": "cpp",
         "ctime": "cpp",
         "cwchar": "cpp",
-        "cstdint": "cpp"
+        "cstdint": "cpp",
+        "thread": "cpp"
     }
 }

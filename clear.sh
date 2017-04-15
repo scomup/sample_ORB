@@ -32,3 +32,8 @@ echo "Cleaning test 06 ..."
 cd test/06_test_map
 rm -rf build
 cd ../../
+
+echo "Cleaning test 07 ..."
+cd test/07_test_poseOptimizer
+rm -rf build
+cd ../../
