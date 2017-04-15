@@ -11,6 +11,7 @@
         "ctime": "cpp",
         "cwchar": "cpp",
         "cstdint": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "mutex": "cpp"
     }
 }
