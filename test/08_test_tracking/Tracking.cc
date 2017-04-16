@@ -22,6 +22,7 @@
 #include "Tracking.h"
 
 #include<opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
 #include<opencv2/features2d/features2d.hpp>
 
 #include"ORBmatcher.h"
@@ -135,7 +136,7 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 
 
 
-cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
+cv::Mat Tracking::GrabImage(const cv::Mat &im, const double &timestamp)
 {
     mImGray = im;
 
@@ -161,6 +162,16 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
 
     Track();
 
+    for (size_t i = 0; i < mCurrentFrame.mvpMapPoints.size(); i++)
+    {
+        if(mCurrentFrame.mvpMapPoints[i] != NULL){
+            cv::KeyPoint kp = mCurrentFrame.mvKeys[i];
+            cv::circle(im, kp.pt, 2,cv::Scalar(0, 255, 0));
+        }
+    }
+    cv::imshow("FRAME", im);
+    cv::waitKey(1);
+
     return mCurrentFrame.mTcw.clone();
 }
 
@@ -179,7 +190,7 @@ void Tracking::Track()
     if(mState==NOT_INITIALIZED)
     {
         
-        MonocularInitialization();
+        Initialization();
 
         //mpFrameDrawer->Update(this);
 
@@ -195,7 +206,8 @@ void Tracking::Track()
         {
             // Local Mapping might have changed some MapPoints tracked in last frame
             //CheckReplacedInLastFrame();
-
+            bOK = TrackReferenceKeyFrame();
+            /*
             if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2)
             {
                 bOK = TrackReferenceKeyFrame();
@@ -203,10 +215,11 @@ void Tracking::Track()
             else
             {
                 //bOK = TrackWithMotionModel();
-                if (!bOK)
-                    bOK = TrackReferenceKeyFrame();
-            }
+                //if (!bOK)
+                //    bOK = TrackReferenceKeyFrame();
+            }*/
         }
+        
         else
         {
             printf("TODO: Cannot tracking!\n");
@@ -243,6 +256,7 @@ void Tracking::Track()
                 mVelocity = cv::Mat();
 
             //mpDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+            mpDrawer->SetCameraPose(mCurrentFrame.mTcw);
 
 
             // Check if we need to insert a new keyframe
@@ -279,7 +293,7 @@ void Tracking::Track()
 
 
 
-void Tracking::MonocularInitialization()
+void Tracking::Initialization()
 {
 
     if(!mpInitializer)
@@ -348,18 +362,16 @@ void Tracking::MonocularInitialization()
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
             mCurrentFrame.SetPose(Tcw);
 
-            CreateInitialMapMonocular();
+            CreateInitialMap();
         }
     }
 }
 
-void Tracking::CreateInitialMapMonocular()
+void Tracking::CreateInitialMap()
 {
     // Create KeyFrames
-    KeyFrame* pKFini = new KeyFrame(mInitialFrame,mpMap);
-    KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpMap);
-
-
+    KeyFrame* pKFini = new KeyFrame(mInitialFrame, mpMap);
+    KeyFrame* pKFcur = new KeyFrame(mCurrentFrame, mpMap);
 
     // Insert KFs in the map
     mpMap->AddKeyFrame(pKFini);

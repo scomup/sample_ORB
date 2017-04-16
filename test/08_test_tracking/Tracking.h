@@ -49,7 +49,7 @@ public:
               const string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
+    cv::Mat GrabImage(const cv::Mat &im, const double &timestamp);
 
     //void SetLocalMapper(LocalMapping* pLocalMapper);
 
@@ -85,8 +85,8 @@ protected:
     // Main tracking function. It is independent of the input sensor.
     void Track();
 
-    void MonocularInitialization();
-    void CreateInitialMapMonocular();
+    void Initialization();
+    void CreateInitialMap();
 
     bool TrackReferenceKeyFrame();
     //void UpdateLastFrame();

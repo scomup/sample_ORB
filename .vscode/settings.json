@@ -12,6 +12,8 @@
         "cwchar": "cpp",
         "cstdint": "cpp",
         "thread": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "iostream": "cpp",
+        "algorithm": "cpp"
     }
 }
