@@ -27,6 +27,7 @@
 
 #include "Drawer.h"
 #include "Map.h"
+#include "LocalMapping.h"
 #include "Frame.h"
 #include "ORBextractor.h"
 #include "Initializer.h"
@@ -38,6 +39,7 @@ namespace sample_ORB
 
 class Drawer;
 class Map;
+class LocalMapping;
 
 class Tracking
 {  
@@ -49,8 +51,7 @@ public:
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImage(const cv::Mat &im, const double &timestamp);
 
-
-
+    void SetLocalMapper(LocalMapping* pLocalMapper);
 
 public:
 
@@ -86,10 +87,35 @@ protected:
     void CreateInitialMap();
 
     bool TrackReferenceKeyFrame();
+    //void UpdateLastFrame();
+    bool TrackWithMotionModel();
 
     bool NeedNewKeyFrame();
 
     void CreateNewKeyFrame();
+
+    void CreateNewMapPoints();
+
+/*
+    // Map initialization for monocular
+    void MonocularInitialization();
+    void CreateInitialMapMonocular();
+
+    void CheckReplacedInLastFrame();
+    bool TrackReferenceKeyFrame();
+    void UpdateLastFrame();
+    bool TrackWithMotionModel();
+
+    void UpdateLocalMap();
+    void UpdateLocalPoints();
+    void UpdateLocalKeyFrames();
+
+    bool TrackLocalMap();
+    void SearchLocalPoints();
+
+*/
+    //Other Thread Pointers
+    LocalMapping* mpLocalMapper;
 
     //ORB
     ORBextractor* mpORBextractor;
@@ -119,14 +145,22 @@ protected:
     int mMinFrames;
     int mMaxFrames;
 
+    //Current matches in frame
+    int mnMatchesInliers;
+
     //Last Frame, KeyFrame and Relocalisation Info
     KeyFrame* mpLastKeyFrame;
     Frame mLastFrame;
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
+    //Motion Model
+    cv::Mat mVelocity;
+
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
+
+    list<MapPoint*> mlpTemporalPoints;
 };
 
 } //namespace ORB_SLAM

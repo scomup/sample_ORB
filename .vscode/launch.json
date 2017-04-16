@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}//test/08_test_tracking/build/test_tracking",
+            "program": "${workspaceRoot}//test/09_test_newKeyframe/build/test_newKeyframe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",
