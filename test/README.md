@@ -22,6 +22,9 @@ Finally we will build a completed map at lesson6.　A module for Visualization a
 ### Lesson07: 07_test_poseOptimizer
 Once ORB_SLAM2 create map, The Optimizer is used to minimized the projection error to find current camera pose. 
 
+### Lesson08: 08_test_tracking
+with the above steps, we can track the camera pose continuously in this range of the initial map.
+
 
 
 
