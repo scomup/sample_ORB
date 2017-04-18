@@ -28,7 +28,8 @@ This lesson introduces the tracking module. we can locate the camera pose contin
 ### Lesson09: 09_test_newKeyframe
 This lesson, we insert new keyframe into the environment map. SLAM try to buiding a map of an unknown environment and locating the robot simultaneously. With the above steps, we can locate the camera pose continuously in this range of the initial map(lesson08) and build environment map. In fact, the basic SLAM has been implemented. 
 
-
+### Lesson09: 09_test_trackLocalmap
+This lesson, we insert new keyframe into the environment map. SLAM try to buiding a map of an unknown environment and locating the robot simultaneously. With the above steps, we can locate the camera pose continuously in this range of the initial map(lesson08) and build environment map. In fact, the basic SLAM has been implemented. 
 
 
 

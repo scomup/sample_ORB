@@ -48,6 +48,11 @@ cd test/09_test_newKeyframe
 rm -rf build
 cd ../../
 
+echo "Cleaning test 10 ..."
+cd test/10_test_trackLocalmap
+rm -rf build
+cd ../../
+
 echo "Cleaning g2o ..."
 cd Thirdparty/g2o
 rm -rf build

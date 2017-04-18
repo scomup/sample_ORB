@@ -227,15 +227,15 @@ void Tracking::Track()
 
         // If we have an initial estimation of the camera pose and matching. Track the local map.
 
-        //if(bOK)
-        //    OK = TrackLocalMap();
+        if(bOK)
+            bOK = TrackLocalMap();
         
 
 
         if(bOK)
             mState = OK;
         else
-            mState=LOST;
+            mState = LOST;
 
         // Update drawer
 
@@ -538,6 +538,94 @@ void Tracking::CreateNewKeyFrame()
     mpLastKeyFrame = pKF;
 }
 
+bool Tracking::TrackLocalMap()
+{
+    // We have an estimation of the camera pose and some map points tracked in the frame.
+    // We retrieve the local map and try to find matches to points in the local map.
+
+    UpdateLocalMap();
+
+    SearchLocalPoints();
+
+    // Optimize Pose
+    Optimizer::PoseOptimization(&mCurrentFrame);
+    mnMatchesInliers = 0;
+
+    // Update MapPoints Statistics
+    for(int i=0; i<mCurrentFrame.N; i++)
+    {
+        if(mCurrentFrame.mvpMapPoints[i])
+        {
+            if(!mCurrentFrame.mvbOutlier[i])
+            {
+                mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
+                if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
+                    mnMatchesInliers++;
+            }
+        }
+    }
+
+    // Decide if the tracking was succesful
+    // More restrictive if there was a relocalization recently
+    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
+        return false;
+    if(mnMatchesInliers<30)
+        return false;
+    else
+        return true;
+}
+
+void Tracking::SearchLocalPoints()
+{
+    // Do not search map points already matched
+    for(vector<MapPoint*>::iterator vit=mCurrentFrame.mvpMapPoints.begin(), vend=mCurrentFrame.mvpMapPoints.end(); vit!=vend; vit++)
+    {
+        MapPoint* pMP = *vit;
+        if(pMP)
+        {
+            if(pMP->isBad())
+            {
+                *vit = static_cast<MapPoint*>(NULL);
+            }
+            else
+            {
+                pMP->IncreaseVisible();
+                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
+                pMP->mbTrackInView = false;
+            }
+        }
+    }
+
+    int nToMatch=0;
+
+    // Project points in frame and check its visibility
+    for(vector<MapPoint*>::iterator vit=mvpLocalMapPoints.begin(), vend=mvpLocalMapPoints.end(); vit!=vend; vit++)
+    {
+        MapPoint* pMP = *vit;
+        if(pMP->mnLastFrameSeen == mCurrentFrame.mnId)
+            continue;
+        if(pMP->isBad())
+            continue;
+        // Project (this fills MapPoint variables for matching)
+        if(mCurrentFrame.isInFrustum(pMP,0.5))
+        {
+            pMP->IncreaseVisible();
+            nToMatch++;
+        }
+    }
+
+    if(nToMatch>0)
+    {
+        ORBmatcher matcher(0.8);
+        int th = 1;
+        // If the camera has been relocalised recently, perform a coarser search
+        if(mCurrentFrame.mnId<mnLastRelocFrameId+2)
+            th=5;
+        matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
+    }
+}
+
+
 /*
 void Tracking::UpdateLastFrame()
 {
@@ -603,7 +691,7 @@ void Tracking::UpdateLastFrame()
         if(vDepthIdx[j].first>mThDepth && nPoints>100)
             break;
     }
-}
+}*/
 
 /*
 bool Tracking::TrackWithMotionModel()
@@ -665,106 +753,9 @@ bool Tracking::TrackWithMotionModel()
     return nmatchesMap>=10;
 }*/
 
-/*
-
-bool Tracking::TrackLocalMap()
-{
-    // We have an estimation of the camera pose and some map points tracked in the frame.
-    // We retrieve the local map and try to find matches to points in the local map.
-
-    UpdateLocalMap();
-
-    SearchLocalPoints();
-
-    // Optimize Pose
-    Optimizer::PoseOptimization(&mCurrentFrame);
-    mnMatchesInliers = 0;
-
-    // Update MapPoints Statistics
-    for(int i=0; i<mCurrentFrame.N; i++)
-    {
-        if(mCurrentFrame.mvpMapPoints[i])
-        {
-            if(!mCurrentFrame.mvbOutlier[i])
-            {
-                mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
-                if(!mbOnlyTracking)
-                {
-                    if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
-                        mnMatchesInliers++;
-                }
-                else
-                    mnMatchesInliers++;
-            }
-            else if(mSensor==System::STEREO)
-                mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
-
-        }
-    }
-
-    // Decide if the tracking was succesful
-    // More restrictive if there was a relocalization recently
-    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && mnMatchesInliers<50)
-        return false;
-
-    if(mnMatchesInliers<30)
-        return false;
-    else
-        return true;
-}
 
 
-void Tracking::SearchLocalPoints()
-{
-    // Do not search map points already matched
-    for(vector<MapPoint*>::iterator vit=mCurrentFrame.mvpMapPoints.begin(), vend=mCurrentFrame.mvpMapPoints.end(); vit!=vend; vit++)
-    {
-        MapPoint* pMP = *vit;
-        if(pMP)
-        {
-            if(pMP->isBad())
-            {
-                *vit = static_cast<MapPoint*>(NULL);
-            }
-            else
-            {
-                pMP->IncreaseVisible();
-                pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-                pMP->mbTrackInView = false;
-            }
-        }
-    }
 
-    int nToMatch=0;
-
-    // Project points in frame and check its visibility
-    for(vector<MapPoint*>::iterator vit=mvpLocalMapPoints.begin(), vend=mvpLocalMapPoints.end(); vit!=vend; vit++)
-    {
-        MapPoint* pMP = *vit;
-        if(pMP->mnLastFrameSeen == mCurrentFrame.mnId)
-            continue;
-        if(pMP->isBad())
-            continue;
-        // Project (this fills MapPoint variables for matching)
-        if(mCurrentFrame.isInFrustum(pMP,0.5))
-        {
-            pMP->IncreaseVisible();
-            nToMatch++;
-        }
-    }
-
-    if(nToMatch>0)
-    {
-        ORBmatcher matcher(0.8);
-        int th = 1;
-        if(mSensor==System::RGBD)
-            th=3;
-        // If the camera has been relocalised recently, perform a coarser search
-        if(mCurrentFrame.mnId<mnLastRelocFrameId+2)
-            th=5;
-        matcher.SearchByProjection(mCurrentFrame,mvpLocalMapPoints,th);
-    }
-}
 
 void Tracking::UpdateLocalMap()
 {
@@ -827,8 +818,8 @@ void Tracking::UpdateLocalKeyFrames()
     if(keyframeCounter.empty())
         return;
 
-    int max=0;
-    KeyFrame* pKFmax= static_cast<KeyFrame*>(NULL);
+    //int max=0;
+    //KeyFrame* pKFmax= static_cast<KeyFrame*>(NULL);
 
     mvpLocalKeyFrames.clear();
     mvpLocalKeyFrames.reserve(3*keyframeCounter.size());
@@ -841,11 +832,11 @@ void Tracking::UpdateLocalKeyFrames()
         if(pKF->isBad())
             continue;
 
-        if(it->second>max)
+        /*if(it->second>max)
         {
             max=it->second;
             pKFmax=pKF;
-        }
+        }*/
 
         mvpLocalKeyFrames.push_back(it->first);
         pKF->mnTrackReferenceForFrame = mCurrentFrame.mnId;
@@ -905,12 +896,16 @@ void Tracking::UpdateLocalKeyFrames()
 
     }
 
+/*
     if(pKFmax)
     {
+        printf("bef:%d\n",mpReferenceKF->mnId);
         mpReferenceKF = pKFmax;
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
+        printf("aft:%d\n",mpReferenceKF->mnId);
     }
-}*/
+*/
+}
 
 
 
