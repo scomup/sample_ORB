@@ -53,6 +53,11 @@ cd test/10_test_trackLocalmap
 rm -rf build
 cd ../../
 
+echo "Cleaning test 11 ..."
+cd test/11_test_bundleAdjustment
+rm -rf build
+cd ../../
+
 echo "Cleaning g2o ..."
 cd Thirdparty/g2o
 rm -rf build
