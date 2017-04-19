@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}//test/10_test_trackLocalmap/build/test_trackLocalmap",
+            "program": "${workspaceRoot}/branch/sample_ORB_local/build/test_bundleAdjustment",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

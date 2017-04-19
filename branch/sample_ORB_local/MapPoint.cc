@@ -1,0 +1,288 @@
+/**
+* This file is part of ORB-SLAM2.
+*
+* Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
+* For more information see <https://github.com/raulmur/ORB_SLAM2>
+*
+* ORB-SLAM2 is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* ORB-SLAM2 is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "MapPoint.h"
+#include "ORBmatcher.h"
+#include<mutex>
+
+namespace sample_ORB
+{
+
+long unsigned int MapPoint::nNextId=0;
+std::mutex MapPoint::mGlobalMutex;
+
+MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF):
+    mnFirstKFid(pRefKF->mnId), 
+    mnFirstFrame(pRefKF->mnFrameId), 
+    mnLastFrameSeen(0),
+    mnTrackReferenceForFrame(0),
+    mpRefKF(pRefKF), 
+    mfMinDistance(0), 
+    mfMaxDistance(0)
+{
+    Pos.copyTo(mWorldPos);
+    mNormalVector = cv::Mat::zeros(3,1,CV_32F);
+
+    // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
+    //std::unique_lock<std::mutex> lock(mpMap->mMutexPointCreation);
+    mnId=nNextId++;
+}
+
+MapPoint::MapPoint(const cv::Mat &Pos, Frame* pFrame, const int &idxF):
+    mnFirstKFid(-1), 
+    mnFirstFrame(pFrame->mnId), 
+    mnLastFrameSeen(0),
+    mnTrackReferenceForFrame(0),
+    mpRefKF(static_cast<KeyFrame*>(NULL))
+    
+{
+    Pos.copyTo(mWorldPos);
+    cv::Mat Ow = pFrame->GetCameraCenter();
+    mNormalVector = mWorldPos - Ow;
+    mNormalVector = mNormalVector/cv::norm(mNormalVector);
+
+    cv::Mat PC = Pos - Ow;
+    const float dist = cv::norm(PC);
+    const int level = pFrame->mvKeysUn[idxF].octave;
+    const float levelScaleFactor =  pFrame->mvScaleFactors[level];
+    const int nLevels = pFrame->mnScaleLevels;
+
+    mfMaxDistance = dist*levelScaleFactor;
+    mfMinDistance = mfMaxDistance/pFrame->mvScaleFactors[nLevels-1];
+
+    pFrame->mDescriptors.row(idxF).copyTo(mDescriptor);
+
+    // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
+    //std::unique_lock<std::mutex> lock(mpMap->mMutexPointCreation);
+    mnId=nNextId++;
+}
+
+void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    if(mObservations.count(pKF))
+        return;
+    mObservations[pKF]=idx;
+}
+
+bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return (mObservations.count(pKF));
+}
+
+void MapPoint::ComputeDistinctiveDescriptors()
+{
+    // Retrieve all observed descriptors
+    std::vector<cv::Mat> vDescriptors;
+
+    std::map<KeyFrame*,size_t> observations;
+
+    {
+        std::unique_lock<std::mutex> lock1(mMutexFeatures);
+        observations=mObservations;
+    }
+
+    if(observations.empty())
+        return;
+
+    vDescriptors.reserve(observations.size());
+
+    for(std::map<KeyFrame*,size_t>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
+    {
+        KeyFrame* pKF = mit->first;
+
+        vDescriptors.push_back(pKF->mDescriptors.row(mit->second));
+    }
+
+    if(vDescriptors.empty())
+        return;
+
+    // Compute distances between them
+    const size_t N = vDescriptors.size();
+
+    float Distances[N][N];
+    for(size_t i=0;i<N;i++)
+    {
+        Distances[i][i]=0;
+        for(size_t j=i+1;j<N;j++)
+        {
+            int distij = ORBmatcher::DescriptorDistance(vDescriptors[i],vDescriptors[j]);
+            Distances[i][j]=distij;
+            Distances[j][i]=distij;
+        }
+    }
+
+    // Take the descriptor with least median distance to the rest
+    int BestMedian = INT_MAX;
+    int BestIdx = 0;
+    for(size_t i=0;i<N;i++)
+    {
+        std::vector<int> vDists(Distances[i],Distances[i]+N);
+        sort(vDists.begin(),vDists.end());
+        int median = vDists[0.5*(N-1)];
+
+        if(median<BestMedian)
+        {
+            BestMedian = median;
+            BestIdx = i;
+        }
+    }
+
+    {
+        std::unique_lock<std::mutex> lock(mMutexFeatures);
+        mDescriptor = vDescriptors[BestIdx].clone();
+    }
+}
+
+void MapPoint::UpdateNormalAndDepth()
+{
+    std::map<KeyFrame*,size_t> observations;
+    KeyFrame* pRefKF;
+    cv::Mat Pos;
+    {
+        std::unique_lock<std::mutex> lock1(mMutexFeatures);
+        std::unique_lock<std::mutex> lock2(mMutexPos);
+        observations=mObservations;
+        pRefKF=mpRefKF;
+        Pos = mWorldPos.clone();
+    }
+
+    if(observations.empty())
+        return;
+
+    cv::Mat normal = cv::Mat::zeros(3,1,CV_32F);
+    int n=0;
+    for(std::map<KeyFrame*,size_t>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
+    {
+        KeyFrame* pKF = mit->first;
+        cv::Mat Owi = pKF->GetCameraCenter();
+        cv::Mat normali = mWorldPos - Owi;
+        normal = normal + normali/cv::norm(normali);
+        n++;
+    }
+
+    cv::Mat PC = Pos - pRefKF->GetCameraCenter();
+    const float dist = cv::norm(PC);
+    const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
+    const float levelScaleFactor =  pRefKF->mvScaleFactors[level];
+    const int nLevels = pRefKF->mnScaleLevels;
+
+    {
+        std::unique_lock<std::mutex> lock3(mMutexPos);
+        mfMaxDistance = dist*levelScaleFactor;
+        mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];
+        mNormalVector = normal/n;
+    }
+}
+
+
+std::map<KeyFrame*, size_t> MapPoint::GetObservations()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return mObservations;
+}
+
+cv::Mat MapPoint::GetWorldPos()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return mWorldPos.clone();
+}
+
+cv::Mat MapPoint::GetDescriptor()
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    return mDescriptor.clone();
+}
+
+
+cv::Mat MapPoint::GetNormal()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return mNormalVector.clone();
+}
+
+float MapPoint::GetMinDistanceInvariance()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return 0.8f*mfMinDistance;
+}
+
+float MapPoint::GetMaxDistanceInvariance()
+{
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    return 1.2f*mfMaxDistance;
+}
+
+int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
+{
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    if(mObservations.count(pKF))
+        return mObservations[pKF];
+    else
+        return -1;
+}
+
+
+void MapPoint::SetWorldPos(const cv::Mat &Pos)
+{
+    std::unique_lock<std::mutex> lock2(mGlobalMutex);
+    std::unique_lock<std::mutex> lock(mMutexPos);
+    Pos.copyTo(mWorldPos);
+}
+
+int MapPoint::PredictScale(const float &currentDist, KeyFrame* pKF)
+{
+    float ratio;
+    {
+        std::unique_lock<std::mutex> lock(mMutexPos);
+        ratio = mfMaxDistance/currentDist;
+    }
+
+    int nScale = ceil(log(ratio)/pKF->mfLogScaleFactor);
+    if(nScale<0)
+        nScale = 0;
+    else if(nScale>=pKF->mnScaleLevels)
+        nScale = pKF->mnScaleLevels-1;
+
+    return nScale;
+}
+
+int MapPoint::PredictScale(const float &currentDist, Frame* pF)
+{
+    float ratio;
+    {
+        std::unique_lock<std::mutex> lock(mMutexPos);
+        ratio = mfMaxDistance/currentDist;
+    }
+
+    int nScale = ceil(log(ratio)/pF->mfLogScaleFactor);
+    if(nScale<0)
+        nScale = 0;
+    else if(nScale>=pF->mnScaleLevels)
+        nScale = pF->mnScaleLevels-1;
+
+    return nScale;
+}
+
+
+
+
+} //namespace ORB_SLAM
