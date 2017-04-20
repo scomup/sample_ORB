@@ -26,7 +26,6 @@
 #include<opencv2/features2d/features2d.hpp>
 
 #include "Drawer.h"
-#include "Map.h"
 #include "LocalMapping.h"
 #include "Frame.h"
 #include "ORBextractor.h"
@@ -45,7 +44,7 @@ class Tracking
 {  
 
 public:
-    Tracking(Drawer* pDrawer,Map* pMap,
+    Tracking(Drawer* pDrawer,
               const string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
@@ -53,7 +52,7 @@ public:
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
 
-    std::vector<KeyFrame*> GetLocalKeyFrames();
+    std::list<KeyFrame*> GetLocalKeyFrames();
 
     std::vector<MapPoint*> GetLocalMapPoints();
 
@@ -139,14 +138,12 @@ protected:
 
     //Local Map
     KeyFrame* mpReferenceKF;
-    std::vector<KeyFrame*> mvpLocalKeyFrames;
+    std::list<KeyFrame*> mlpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
     
     //Drawers
     Drawer* mpDrawer;
 
-    //Map
-    Map* mpMap;
 
     //Calibration matrix
     cv::Mat mK;
@@ -173,6 +170,8 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+
+    std::mutex mMutexLocalKeyFrames;
 };
 
 } //namespace ORB_SLAM

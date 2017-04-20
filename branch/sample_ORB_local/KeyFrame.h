@@ -23,11 +23,11 @@
 
 #include "ORBextractor.h"
 #include "Frame.h"
-#include "Map.h"
 
 #include <mutex>
 #include <set>
 #include <map>
+#include <list>
 
 namespace sample_ORB
 {
@@ -48,6 +48,8 @@ public:
     cv::Mat GetCameraCenter();
     cv::Mat GetRotation();
     cv::Mat GetTranslation();
+
+    void EraseMapPointMatch(MapPoint* pMP);
 
     //void EraseConnection(KeyFrame* pKF);
     void ChangeParent(KeyFrame *pKF);
@@ -132,7 +134,6 @@ protected:
     // Spanning Tree and Loop Edges
     KeyFrame* mpParent;
 
-    //Map* mpMap;
     std::mutex mMutexPose;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;

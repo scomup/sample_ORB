@@ -33,6 +33,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF):
     mnFirstFrame(pRefKF->mnFrameId), 
     mnLastFrameSeen(0),
     mnTrackReferenceForFrame(0),
+    mnBALocalForKF(0),
     mpRefKF(pRefKF), 
     mfMinDistance(0), 
     mfMaxDistance(0)
@@ -50,6 +51,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, Frame* pFrame, const int &idxF):
     mnFirstFrame(pFrame->mnId), 
     mnLastFrameSeen(0),
     mnTrackReferenceForFrame(0),
+    mnBALocalForKF(0),
     mpRefKF(static_cast<KeyFrame*>(NULL))
     
 {
@@ -86,6 +88,20 @@ bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 {
     std::unique_lock<std::mutex> lock(mMutexFeatures);
     return (mObservations.count(pKF));
+}
+
+void MapPoint::EraseObservation(KeyFrame* pKF)
+{
+    
+    std::unique_lock<std::mutex> lock(mMutexFeatures);
+    if(mObservations.count(pKF))
+    {
+        int idx = mObservations[pKF];
+        mObservations.erase(pKF);
+        if(mpRefKF==pKF)
+            mpRefKF=mObservations.begin()->first;
+    }
+    
 }
 
 void MapPoint::ComputeDistinctiveDescriptors()

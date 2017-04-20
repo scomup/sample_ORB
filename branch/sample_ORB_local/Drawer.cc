@@ -2,8 +2,8 @@
 #include <pangolin/pangolin.h>
 
 #include <mutex>
-
 #include <limits>
+
 namespace sample_ORB
 {
 
@@ -110,7 +110,7 @@ void Drawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
     const float h = w*0.75;
     const float z = w*0.6;
 
-    const std::vector<KeyFrame*> vpKFs = mvpLocalKeyFrames;
+    const std::vector<KeyFrame*> vpKFs(mlpLocalKeyFrames.begin(), mlpLocalKeyFrames.end());
 
     if(bDrawKF)
     {
@@ -226,10 +226,10 @@ void Drawer::DrawMapPoints()
 
     glEnd();
 }
-void Drawer::SetDrawer(cv::Mat& CameraPose, std::vector<KeyFrame*> vpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints){
+void Drawer::SetDrawer(cv::Mat& CameraPose, std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints){
     mCameraPose = CameraPose;
     mvpLocalMapPoints = vpLocalMapPoints;
-    mvpLocalKeyFrames = vpLocalKeyFrames;
+    mlpLocalKeyFrames = lpLocalKeyFrames;
 
 }
 

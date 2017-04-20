@@ -165,7 +165,7 @@ int ORBmatcher::SearchNearby(KeyFrame *pKF, Frame &F)
 {
     int nmatches = 0;
     int ORBdist = 50;
-    int r = 50;
+    int r = 200;
 
     vector<int> rotHist[HISTO_LENGTH];
     for (int i = 0; i < HISTO_LENGTH; i++)

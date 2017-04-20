@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/branch/sample_ORB_local/build/test_bundleAdjustment",
+            "program": "${workspaceRoot}/branch/sample_ORB_local/build/local_SLAM",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

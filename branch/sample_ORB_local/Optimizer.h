@@ -21,7 +21,7 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
-#include "Map.h"
+#include <list>
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "Frame.h"
@@ -36,7 +36,7 @@ class Optimizer
 {
 public:
     int static PoseOptimization(Frame* pFrame);
-    void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+    void static LocalBundleAdjustment(KeyFrame *pKF, std::list<KeyFrame*> lLocalKeyFrames, bool* pbStopFlag);
 };
 
 } //namespace ORB_SLAM

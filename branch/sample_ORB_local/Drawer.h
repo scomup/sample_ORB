@@ -5,13 +5,17 @@
 #include <mutex>
 #include <opencv2/core/core.hpp>
 #include "Tracking.h"
+#include "KeyFrame.h"
 #include <pangolin/pangolin.h>
+#include <list>
 
-#include "Map.h"
 namespace sample_ORB
 {
 class Tracking;
+class KeyFrame;
+
 class Drawer
+
 {
 public:
     Drawer();
@@ -21,11 +25,11 @@ public:
     void DrawMapPoints();
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
     void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
-    void SetDrawer(cv::Mat& CameraPose, std::vector<KeyFrame*> vpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints);
+    void SetDrawer(cv::Mat& CameraPose, std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints);
 
 
 private:
-    std::vector<KeyFrame*> mvpLocalKeyFrames;
+    std::list<KeyFrame*> mlpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
     std::mutex mTx_;
     std::mutex mMutexCamera;

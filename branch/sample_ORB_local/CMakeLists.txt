@@ -1,9 +1,24 @@
 cmake_minimum_required(VERSION 2.8)
-project(test_bundleAdjustment)
+project(local_SLAM)
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O0 -march=native -std=c++0x")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O0 -march=native -std=c++0x")
-SET(CMAKE_BUILD_TYPE Debug)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  cv_bridge
+  image_transport
+  rospy
+  std_msgs
+)
+
+
+include_directories(include 
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS})
+
+
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native -std=c++0x")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native -std=c++0x")
+SET(CMAKE_BUILD_TYPE Release)
+#SET(CMAKE_BUILD_TYPE Debug)
 
 
 find_package(OpenCV 2.4.3 REQUIRED)
@@ -29,7 +44,6 @@ Initializer.cc
 Drawer.cc
 KeyFrame.cc
 MapPoint.cc
-Map.cc
 Optimizer.cc
 Converter.cc
 Tracking.cc
@@ -37,6 +51,7 @@ LocalMapping.cc
 )
 
 target_link_libraries(${PROJECT_NAME}
+${catkin_LIBRARIES}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}

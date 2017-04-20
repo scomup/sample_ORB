@@ -27,7 +27,6 @@
 
 #include"ORBmatcher.h"
 #include"Drawer.h"
-#include"Map.h"
 #include"Initializer.h"
 
 #include"Optimizer.h"
@@ -42,11 +41,10 @@ using namespace std;
 namespace sample_ORB
 {
 
-Tracking::Tracking(Drawer *pDrawer, Map *pMap,  const string &strSettingPath):
+Tracking::Tracking(Drawer *pDrawer,  const string &strSettingPath):
     mState(NO_IMAGES_YET),
     mpInitializer(static_cast<Initializer*>(NULL)),
-    mpDrawer(pDrawer), 
-    mpMap(pMap)
+    mpDrawer(pDrawer)
 {
     // Load camera parameters from settings file
 
@@ -184,8 +182,6 @@ void Tracking::Track()
 
     mLastProcessedState=mState;
 
-    // Get Map Mutex -> Map cannot be changed
-    unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
     if(mState==NOT_INITIALIZED)
     {
@@ -203,6 +199,9 @@ void Tracking::Track()
         if (mState == OK)
         {
             bOK = TrackReferenceKeyFrame();
+            if(!bOK){
+                printf("TrackReferenceKeyFrame Error!\n");
+            }
         }
         
         else
@@ -218,33 +217,66 @@ void Tracking::Track()
         if(bOK)
             mState = OK;
         else
-            mState = LOST;
+             mState = LOST;
 
         if(bOK)
         {
             // Check if we need to insert a new keyframe
-            if(NeedNewKeyFrame())
-                CreateNewKeyFrame();
 
-            // We allow points with high innovation (considererd outliers by the Huber Function)
-            // pass to the new keyframe, so that bundle adjustment will finally decide
-            // if they are outliers or not. We don't want next frame to estimate its position
-            // with those points so we discard them in the frame.
-            for(int i=0; i<mCurrentFrame.N;i++)
+            if(NeedNewKeyFrame())
             {
-                if(mCurrentFrame.mvpMapPoints[i] && mCurrentFrame.mvbOutlier[i])
-                    mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                CreateNewKeyFrame();
+            }
+            else
+            {
+                /*
+                map<KeyFrame *, int> KFcounter;
+                for (vector<MapPoint *>::iterator vit = mCurrentFrame.mvpMapPoints.begin(), vend = mCurrentFrame.mvpMapPoints.end(); vit != vend; vit++)
+                {
+                    MapPoint *pMP = *vit;
+
+                    if (!pMP)
+                        continue;
+
+                    map<KeyFrame *, size_t> observations = pMP->GetObservations();
+
+                    for (map<KeyFrame *, size_t>::iterator mit = observations.begin(), mend = observations.end(); mit != mend; mit++)
+                    {
+                        KFcounter[mit->first]++;
+                    }
+                }
+                KeyFrame *currentBestKF = 0;
+                int currentMax = 0;
+                for (auto it = KFcounter.begin(); it != KFcounter.end(); ++it)
+                {
+
+                    if (it->second > currentMax)
+                    {
+                        currentBestKF = it->first;
+                        currentMax = it->second;
+                    }
+                }
+                mpReferenceKF = currentBestKF;
+                */
+        }
+
+        // We allow points with high innovation (considererd outliers by the Huber Function)
+        // pass to the new keyframe, so that bundle adjustment will finally decide
+        // if they are outliers or not. We don't want next frame to estimate its position
+        // with those points so we discard them in the frame.
+        for (int i = 0; i < mCurrentFrame.N; i++)
+        {
+            if (mCurrentFrame.mvpMapPoints[i] && mCurrentFrame.mvbOutlier[i])
+                mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint *>(NULL);
             }
         }
 
         // Reset if the camera get lost soon after initialization
         if(mState==LOST)
         {
-            if(mpMap->KeyFramesInMap()<=5)
-            {
-                cout << "TODO: initialization reseting..." << endl;
-                return;
-            }
+            cout << "TODO: initialization reseting..." << endl;
+            return;
+            
         }
 
         if(!mCurrentFrame.mpReferenceKF)
@@ -252,7 +284,7 @@ void Tracking::Track()
 
         mLastFrame = Frame(mCurrentFrame);
     }
-    mpDrawer->SetDrawer(mCurrentFrame.mTcw, mvpLocalKeyFrames, mvpLocalMapPoints);
+    mpDrawer->SetDrawer(mCurrentFrame.mTcw, mlpLocalKeyFrames, mvpLocalMapPoints);
 
 }
 
@@ -368,10 +400,7 @@ void Tracking::CreateInitialMap()
     // Update Connections
     pKFcur->ChangeParent(pKFini);
 
-    // Bundle Adjustment
-    cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
-
-    //Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    cout << "New Map created ! " << endl;
 
     if(pKFcur->TrackedMapPoints(1)<100)
     {
@@ -387,20 +416,12 @@ void Tracking::CreateInitialMap()
     mCurrentFrame.SetPose(pKFcur->GetPose());
     mnLastKeyFrameId=mCurrentFrame.mnId;
     mpLastKeyFrame = pKFcur;
-
-    mvpLocalKeyFrames.push_back(pKFcur);
-    mvpLocalKeyFrames.push_back(pKFini);
-    mvpLocalMapPoints=mpMap->GetAllMapPoints();
+    mlpLocalKeyFrames.push_back(pKFini);
+    mlpLocalKeyFrames.push_back(pKFcur);
     mpReferenceKF = pKFcur;
     mCurrentFrame.mpReferenceKF = pKFcur;
-
     mLastFrame = Frame(mCurrentFrame);
 
-    mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
-
-    //mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
-
-    mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
     mState=OK;
 }
@@ -470,9 +491,10 @@ bool Tracking::TrackReferenceKeyFrame()
 bool Tracking::NeedNewKeyFrame()
 {
 
-    static int c = 0;
+    int nRefMatches = mpReferenceKF->TrackedMapPoints(1);
 
-    if(c++ % 2 == 0)
+    const bool c = (mnMatchesInliers<nRefMatches*0.6 );
+    if(c)
     {
         return true;
     }
@@ -498,13 +520,16 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
-    mvpLocalKeyFrames.push_back(pKF);
+    mlpLocalKeyFrames.push_back(pKF);
+    if(mlpLocalKeyFrames.size()>10){
+        mlpLocalKeyFrames.pop_front();
+    }
 
 }
 
 bool Tracking::TrackLocalMap()
 {
-    //Find all MapPoints in mvpLocalKeyFrames.
+    //Find all MapPoints in mlpLocalKeyFrames.
     UpdateLocalPoints();
     //Try to match MapPoints to CurrentFrame.
     SearchLocalPoints();
@@ -526,6 +551,7 @@ bool Tracking::TrackLocalMap()
         }
     }
     // Decide if the tracking was succesful
+    printf("mnMatchesInliers:%ld\n",mnMatchesInliers);
     if(mnMatchesInliers<30)
         return false;
     else
@@ -577,9 +603,7 @@ void Tracking::UpdateLocalPoints()
 {
     mvpLocalMapPoints.clear();
 
-    cout<<mvpLocalKeyFrames.size()<<endl;
-
-    for(vector<KeyFrame*>::const_iterator itKF=mvpLocalKeyFrames.begin(), itEndKF=mvpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
+    for(auto itKF=mlpLocalKeyFrames.begin(), itEndKF=mlpLocalKeyFrames.end(); itKF!=itEndKF; itKF++)
     {
         KeyFrame* pKF = *itKF;
         const vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
@@ -599,8 +623,9 @@ void Tracking::UpdateLocalPoints()
 }
 
 
-std::vector<KeyFrame*> Tracking::GetLocalKeyFrames(){
-    return mvpLocalKeyFrames;
+std::list<KeyFrame*> Tracking::GetLocalKeyFrames(){
+    //unique_lock<mutex> lock(mMutexNewKFs);
+    return mlpLocalKeyFrames;
 }
 
 std::vector<MapPoint*> Tracking::GetLocalMapPoints(){

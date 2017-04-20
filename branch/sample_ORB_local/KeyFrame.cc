@@ -20,7 +20,7 @@
 
 #include "KeyFrame.h"
 #include "ORBmatcher.h"
-#include<mutex>
+#include <mutex>
 
 namespace sample_ORB
 {
@@ -171,6 +171,12 @@ bool KeyFrame::IsInImage(const float &x, const float &y) const
     return (x>=mnMinX && x<mnMaxX && y>=mnMinY && y<mnMaxY);
 }
 
+void KeyFrame::EraseMapPointMatch(MapPoint* pMP)
+{
+    int idx = pMP->GetIndexInKeyFrame(this);
+    if(idx>=0)
+        mvpMapPoints[idx]=static_cast<MapPoint*>(NULL);
+}
 
 vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const float &r) const
 {

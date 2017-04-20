@@ -27,8 +27,9 @@
 namespace sample_ORB
 {
 
-LocalMapping::LocalMapping(Map *pMap)
+LocalMapping::LocalMapping()
 {
+    printf("Initial LocalMapping!\n");
 }
 
 
@@ -37,40 +38,18 @@ void LocalMapping::Run()
 
 
     // Check if there are keyframes in the queue
-    if (CheckNewKeyFrames())
+    while (true)
     {
-        mvpLocalMapPoints = mpTracker->GetLocalMapPoints();
-        mvpLocalKeyFrames = mpTracker->GetLocalKeyFrames();
-        ProcessNewKeyFrame();
-        CreateNewMapPoints();
-
-/*
-        if(!CheckNewKeyFrames())
+        if (CheckNewKeyFrames())
         {
-            // Find more matches in neighbor keyframes and fuse point duplications
-            SearchInNeighbors();
-        }
-
-        if(!CheckNewKeyFrames())
-        {
+            ProcessNewKeyFrame();
+            CreateNewMapPoints();
             bool mbAbortBA = 0;
-            // Local BA
-        if(mpMap->KeyFramesInMap()>2)
-                Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
-
-            // Check redundant local Keyframes
-            KeyFrameCulling();
-            }*/
-
-
+            if (mlpLocalKeyFrames.size() > 2)
+                Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, mlpLocalKeyFrames, &mbAbortBA);
+        }
+         usleep(3000);
     }
-
-    //if (CheckFinish())
-     //   break;
-
-    usleep(3000);
-
-    //SetFinish();
 }
 
 void LocalMapping::SetTracker(Tracking *pTracker)
@@ -93,10 +72,17 @@ bool LocalMapping::CheckNewKeyFrames()
 
 void LocalMapping::ProcessNewKeyFrame()
 {
-    {
-        unique_lock<mutex> lock(mMutexNewKFs);
-        mpCurrentKeyFrame = mlNewKeyFrames.front();
-        mlNewKeyFrames.pop_front();
+    
+    unique_lock<mutex> lock(mMutexNewKFs);
+    mpCurrentKeyFrame = mlNewKeyFrames.front();
+    mlNewKeyFrames.pop_front();
+    mlpLocalKeyFrames.push_back(mpCurrentKeyFrame);
+    
+
+    KeyFrame* pKF = mpCurrentKeyFrame;
+    while(mlpLocalKeyFrames.size()<5 && pKF->mnId != 0){
+        pKF = pKF->GetParent();
+        mlpLocalKeyFrames.push_back(pKF);
     }
 
     // Associate MapPoints to the new keyframe and update normal and descriptor
@@ -127,7 +113,7 @@ void LocalMapping::CreateNewMapPoints()
     int nn = 10;
     //if(mbMonocular)
         nn=20;
-    const vector<KeyFrame*> vpNeighKFs = mvpLocalKeyFrames;
+    std::vector<KeyFrame*> vpNeighKFs(mlpLocalKeyFrames.begin(), mlpLocalKeyFrames.end());
     ORBmatcher matcher(0.6,false);
 
     cv::Mat Rcw1 = mpCurrentKeyFrame->GetRotation();

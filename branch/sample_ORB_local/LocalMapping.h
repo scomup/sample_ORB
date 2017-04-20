@@ -22,7 +22,6 @@
 #define LOCALMAPPING_H
 
 #include "KeyFrame.h"
-#include "Map.h"
 #include "Tracking.h"
 
 #include <mutex>
@@ -38,7 +37,7 @@ class Map;
 class LocalMapping
 {
 public:
-    LocalMapping(Map* pMap);
+    LocalMapping();
 
     void Run();
 
@@ -59,7 +58,7 @@ protected:
 
     std::mutex mMutexFinish;
 
-    std::vector<KeyFrame*> mvpLocalKeyFrames;
+    std::list<KeyFrame*> mlpLocalKeyFrames;
 
     std::vector<MapPoint*> mvpLocalMapPoints;
 

@@ -21,7 +21,7 @@
 
 #include<vector>
 
-//#include "MapPoint.h"
+#include "MapPoint.h"
 #include "KeyFrame.h"
 #include "ORBextractor.h"
 

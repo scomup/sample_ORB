@@ -23,7 +23,6 @@
 
 #include"KeyFrame.h"
 #include"Frame.h"
-#include"Map.h"
 
 #include <vector>
 #include <list>
@@ -61,7 +60,7 @@ public:
     void SetWorldPos(const cv::Mat &Pos);
     int PredictScale(const float &currentDist, Frame* pF);
     int PredictScale(const float &currentDist, KeyFrame* pKF);
-
+    void EraseObservation(KeyFrame* pKF);
 
 public:
     long unsigned int mnId;
@@ -78,7 +77,9 @@ public:
     float mTrackViewCos;
     long unsigned int mnLastFrameSeen;
     long unsigned int mnTrackReferenceForFrame;
-
+    // Variables used by the local mapping
+    long unsigned int mnBALocalForKF;
+    
     static std::mutex mGlobalMutex;
 
 protected:    
