@@ -48,7 +48,7 @@ public:
               const string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    cv::Mat GrabImage(const cv::Mat &im, const double &timestamp);
+    cv::Mat GrabImage(const cv::Mat &im, cv::Vec3f mOdom ,const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
 

@@ -134,7 +134,7 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 
 
 
-cv::Mat Tracking::GrabImage(const cv::Mat &im, const double &timestamp)
+cv::Mat Tracking::GrabImage(const cv::Mat &im, cv::Vec3f odom, const double &timestamp)
 {
     mImGray = im;
 
@@ -154,9 +154,9 @@ cv::Mat Tracking::GrabImage(const cv::Mat &im, const double &timestamp)
     }
 
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mK,mDistCoef);
+        mCurrentFrame = Frame(mImGray,odom,timestamp,mpIniORBextractor,mK,mDistCoef);
     else
-        mCurrentFrame = Frame(mImGray,timestamp,mpORBextractor,mK,mDistCoef);
+        mCurrentFrame = Frame(mImGray,odom,timestamp,mpORBextractor,mK,mDistCoef);
 
     Track();
     cv::Mat sim = im.clone();
@@ -198,9 +198,17 @@ void Tracking::Track()
 
         if (mState == OK)
         {
-            bOK = TrackReferenceKeyFrame();
-            if(!bOK){
-                printf("TrackReferenceKeyFrame Error!\n");
+            if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2)
+            {
+                bOK = TrackReferenceKeyFrame();
+            }
+            else
+            {
+                bOK = TrackWithMotionModel();
+                if (!bOK)
+                {
+                    bOK = TrackReferenceKeyFrame();
+                }
             }
         }
         
@@ -217,7 +225,10 @@ void Tracking::Track()
         if(bOK)
             mState = OK;
         else
-             mState = LOST;
+        {
+            mState = LOST;
+            printf("TrackLocalMap Error!\n");
+        }
 
         if(bOK)
         {
@@ -258,6 +269,22 @@ void Tracking::Track()
                 }
                 mpReferenceKF = currentBestKF;
                 */
+                
+        }
+
+                // If tracking were good, check if we insert a keyframe
+        if (bOK)
+        {
+            // Update motion model
+            if (!mLastFrame.mTcw.empty())
+            {
+                cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
+                mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
+                mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
+                mVelocity = mCurrentFrame.mTcw * LastTwc;
+            }
+            else
+                mVelocity = cv::Mat();
         }
 
         // We allow points with high innovation (considererd outliers by the Huber Function)
@@ -275,6 +302,7 @@ void Tracking::Track()
         if(mState==LOST)
         {
             cout << "TODO: initialization reseting..." << endl;
+            exit(0);
             return;
             
         }
@@ -301,13 +329,13 @@ bool Tracking::TrackWithMotionModel()
     int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th);
 
     // If few matches, uses a wider window search
-    if(nmatches<20)
+    if(nmatches<100)
     {
         fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
         nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th);
     }
 
-    if(nmatches<20)
+    if(nmatches<50)
         return false;
 
     // Optimize frame pose with all matches
@@ -333,29 +361,29 @@ bool Tracking::TrackWithMotionModel()
         }
     }    
 
-    return nmatchesMap>=10;
+    return nmatchesMap>=30;
 }
 
 void Tracking::Initialization()
 {
 
-    if(!mpInitializer)
+    if (!mpInitializer)
     {
         // Set Reference Frame
-        if(mCurrentFrame.mvKeys.size()>100)
+        if (mCurrentFrame.mvKeys.size() > 100)
         {
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
-            for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
-                mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
+            for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
+                mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
 
-            if(mpInitializer)
+            if (mpInitializer)
                 delete mpInitializer;
 
-            mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
+            mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
 
-            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
             return;
         }
@@ -363,49 +391,133 @@ void Tracking::Initialization()
     else
     {
         // Try to initialize
-        if((int)mCurrentFrame.mvKeys.size()<=50)
+        if ((int)mCurrentFrame.mvKeys.size() <= 50)
         {
             delete mpInitializer;
-            mpInitializer = static_cast<Initializer*>(NULL);
-            fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            mpInitializer = static_cast<Initializer *>(NULL);
+            fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
             return;
         }
 
         // Find correspondences
-        ORBmatcher matcher(0.7,true);
-        int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
+        ORBmatcher matcher(0.7, true);
+        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
 
         // Check if there are enough correspondences
-        if(nmatches<30)
+        if (nmatches < 100)
         {
-            delete mpInitializer;
-            mpInitializer = static_cast<Initializer*>(NULL);
+            mState = NOT_INITIALIZED;
             return;
         }
 
-        cv::Mat Rcw; // Current Camera Rotation
-        cv::Mat tcw; // Current Camera Translation
-        vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
+        float yaw_ci = mInitialFrame.mYaw - mCurrentFrame.mYaw;
+        //cv::Mat t_ci = mCurrentFrame.mTranspose - mInitialFrame.mTranspose;
 
-        if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
+        if (yaw_ci < -PI)
         {
-            for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
+            yaw_ci += 2 * PI;
+        }
+        else if (yaw_ci > PI)
+        {
+            yaw_ci -= 2 * PI;
+        }
+        cv::Mat R_ci = computeMatrixFromAngles(0, 0, yaw_ci);
+        cv::Mat R_cw = computeMatrixFromAngles(0, 0, -mCurrentFrame.mYaw);
+        cv::Mat t_ci = -R_cw * (mCurrentFrame.mTranspose - mInitialFrame.mTranspose);
+
+        cv::Mat Rcw2 = R_ci;
+        cv::Mat Rwc2 = Rcw2.t();
+        cv::Mat tcw2 = t_ci;
+
+        cv::Mat Tcw2(3, 4, CV_32F);
+        Rcw2.copyTo(Tcw2.colRange(0, 3));
+        tcw2.copyTo(Tcw2.col(3));
+
+        cv::Mat Rcw1 = cv::Mat::eye(3, 3, CV_32F);
+        cv::Mat Rwc1 = cv::Mat::eye(3, 3, CV_32F);
+        cv::Mat tcw1 = cv::Mat::zeros(3, 1, CV_32F);
+        cv::Mat Tcw1 = cv::Mat::eye(3, 4, CV_32F);
+
+        const float fx2 = mCurrentFrame.fx;
+        const float fy2 = mCurrentFrame.fy;
+        const float cx2 = mCurrentFrame.cx;
+        const float cy2 = mCurrentFrame.cy;
+        const float invfx2 = 1.0f / fx2;
+        const float invfy2 = 1.0f / fy2;
+
+        const float fx1 = mInitialFrame.fx;
+        const float fy1 = mInitialFrame.fy;
+        const float cx1 = mInitialFrame.cx;
+        const float cy1 = mInitialFrame.cy;
+        const float invfx1 = 1.0f / fx1;
+        const float invfy1 = 1.0f / fy1;
+
+        // Triangulate each match
+        //mInitialFrame,mCurrentFrame
+        //   SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
+        double base_line = cv::norm(tcw2);
+        //printf("%f\n",base_line);
+        //printf("tfi->x:%5.3f y:%5.3f z:%5.3f yaw:%5.3f\n",-transpose.y(), transpose.x(), transpose.z(), mCurrentFrame.mYaw);
+        if (base_line > 1.0)
+        {
+            mvIniP3D.resize(mvIniMatches.size());
+            for (size_t ikp = 0, iendkp = mvIniMatches.size(); ikp < iendkp; ikp++)
             {
-                if(mvIniMatches[i]>=0 && !vbTriangulated[i])
-                {
-                    mvIniMatches[i]=-1;
-                    nmatches--;
-                }
+                if (mvIniMatches[ikp] == -1)
+                    continue;
+
+                const cv::KeyPoint &kp1 = mInitialFrame.mvKeysUn[ikp];
+                const cv::KeyPoint &kp2 = mCurrentFrame.mvKeysUn[mvIniMatches[ikp]];
+
+                //cv::line(mInitialFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
+                //cv::line(mCurrentFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
+                //cv::circle(mInitialFrame.im, kp1.pt, 2, cv::Scalar(0, 255, 0));
+                //cv::circle(mCurrentFrame.im, kp2.pt, 2, cv::Scalar(0, 255, 0));
+
+                // Check parallax between rays
+                cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1) * invfx1, (kp1.pt.y - cy1) * invfy1, 1.0);
+                cv::Mat ray1 = Rwc1 * xn1;
+                cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2) * invfx2, (kp2.pt.y - cy2) * invfy2, 1.0);
+                cv::Mat ray2 = Rwc2 * xn2;
+                const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
+
+                if (cosParallaxRays < 0 || cosParallaxRays > 0.9998)
+                    continue;
+
+                // Linear Triangulation Method
+                cv::Mat A(4, 4, CV_32F);
+                A.row(0) = xn1.at<float>(0) * Tcw1.row(2) - Tcw1.row(0);
+                A.row(1) = xn1.at<float>(1) * Tcw1.row(2) - Tcw1.row(1);
+                A.row(2) = xn2.at<float>(0) * Tcw2.row(2) - Tcw2.row(0);
+                A.row(3) = xn2.at<float>(1) * Tcw2.row(2) - Tcw2.row(1);
+
+                cv::Mat w, u, vt;
+                cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+                cv::Mat x3D = vt.row(3).t();
+
+                if (x3D.at<float>(3) == 0)
+                    continue;
+
+                // Euclidean coordinates
+                x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
+                cv::Mat x3Dt = x3D.t();
+
+                //Check triangulation in front of cameras
+                float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
+                if (z1 <= 0)
+                    continue;
+
+                float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
+                if (z2 <= 0)
+                    continue;
+                mvIniP3D[ikp] = cv::Point3f(x3Dt.at<float>(0), x3Dt.at<float>(1), x3Dt.at<float>(2));
+                //printf("init point %5.3f %5.3f %5.3f\n",x3Dt.at<float>(0),x3Dt.at<float>(1),x3Dt.at<float>(2));
             }
-
-            // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-            tcw.copyTo(Tcw.rowRange(0,3).col(3));
-            mCurrentFrame.SetPose(Tcw);
-
-            CreateInitialMap();
+            //cv::imwrite("left.png",mInitialFrame.im);
+            //cv::imwrite("right.png",mCurrentFrame.im);
+            CreateInitialMap(Rcw1, tcw1);
+            cout << "My Initial OK!" << endl;
         }
     }
 }
@@ -597,7 +709,7 @@ bool Tracking::TrackLocalMap()
         }
     }
     // Decide if the tracking was succesful
-    printf("mnMatchesInliers:%ld\n",mnMatchesInliers);
+    //printf("mnMatchesInliers:%ld\n",mnMatchesInliers);
     if(mnMatchesInliers<30)
         return false;
     else

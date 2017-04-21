@@ -99,9 +99,9 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     mOdom[1] = mV*deltaTimeStamp;
     mOdom[2] = mYawRate*deltaTimeStamp;
 
-     cout<<"====================="<<endl;
+    // cout<<"====================="<<endl;
     cout<<"odom:"<<mOdom<<endl;
-    mpTracker->GrabImage(cv_ptr->image, 0);
+    mpTracker->GrabImage(cv_ptr->image, mOdom ,0);
     preTimeStamp = mTimeStamp;
 
 }
