@@ -28,8 +28,8 @@
 #include"ORBmatcher.h"
 #include"Drawer.h"
 #include"Initializer.h"
-
 #include"Optimizer.h"
+#include "Converter.h"
 
 #include<iostream>
 
@@ -204,9 +204,11 @@ void Tracking::Track()
             }
             else
             {
+                //bOK = TrackReferenceKeyFrame();
                 bOK = TrackWithMotionModel();
                 if (!bOK)
                 {
+                    printf("TrackReferenceKeyFrame!\n");
                     bOK = TrackReferenceKeyFrame();
                 }
             }
@@ -214,13 +216,16 @@ void Tracking::Track()
         
         else
         {
-            printf("TODO: Cannot tracking!\n");
+            printf("TODO: pose error!\n");
         }
 
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
         if(bOK)
             bOK = TrackLocalMap();
+        else
+            printf("TODO: Cannot tracking!\n");
+
 
         if(bOK)
             mState = OK;
@@ -370,6 +375,9 @@ void Tracking::Initialization()
     if (!mpInitializer)
     {
         // Set Reference Frame
+        mDiffPose[0] = 0;
+        mDiffPose[1] = 0;
+        mDiffPose[2] = 0;
         if (mCurrentFrame.mvKeys.size() > 100)
         {
             mInitialFrame = Frame(mCurrentFrame);
@@ -409,10 +417,8 @@ void Tracking::Initialization()
             mState = NOT_INITIALIZED;
             return;
         }
-
-        float yaw_ci = mInitialFrame.mYaw - mCurrentFrame.mYaw;
-        //cv::Mat t_ci = mCurrentFrame.mTranspose - mInitialFrame.mTranspose;
-
+        mDiffPose[2] += mCurrentFrame.mOdom[2];
+        /*
         if (yaw_ci < -PI)
         {
             yaw_ci += 2 * PI;
@@ -421,13 +427,16 @@ void Tracking::Initialization()
         {
             yaw_ci -= 2 * PI;
         }
-        cv::Mat R_ci = computeMatrixFromAngles(0, 0, yaw_ci);
-        cv::Mat R_cw = computeMatrixFromAngles(0, 0, -mCurrentFrame.mYaw);
-        cv::Mat t_ci = -R_cw * (mCurrentFrame.mTranspose - mInitialFrame.mTranspose);
+        */
+        cv::Mat Ric = Converter::computeMatrixFromAngles(0, 0, mDiffPose[2]);
+        cv::Mat dtic = Ric*(cv::Mat_<float>(3,1) << mCurrentFrame.mOdom[0], mCurrentFrame.mOdom[1], 0);
+        mDiffPose[0] +=dtic.at<float>(0);
+        mDiffPose[1] +=dtic.at<float>(1);
+        cout<<mDiffPose<<endl;
 
-        cv::Mat Rcw2 = R_ci;
-        cv::Mat Rwc2 = Rcw2.t();
-        cv::Mat tcw2 = t_ci;
+        cv::Mat Rcw2 = Ric.t();
+        cv::Mat Rwc2 = Ric;
+        cv::Mat tcw2 = -Rcw2*(cv::Mat_<float>(3,1) << mDiffPose[0], mDiffPose[1], 0);
 
         cv::Mat Tcw2(3, 4, CV_32F);
         Rcw2.copyTo(Tcw2.colRange(0, 3));
@@ -458,7 +467,7 @@ void Tracking::Initialization()
         double base_line = cv::norm(tcw2);
         //printf("%f\n",base_line);
         //printf("tfi->x:%5.3f y:%5.3f z:%5.3f yaw:%5.3f\n",-transpose.y(), transpose.x(), transpose.z(), mCurrentFrame.mYaw);
-        if (base_line > 1.0)
+        if (base_line > 0.1)
         {
             mvIniP3D.resize(mvIniMatches.size());
             for (size_t ikp = 0, iendkp = mvIniMatches.size(); ikp < iendkp; ikp++)
@@ -468,6 +477,12 @@ void Tracking::Initialization()
 
                 const cv::KeyPoint &kp1 = mInitialFrame.mvKeysUn[ikp];
                 const cv::KeyPoint &kp2 = mCurrentFrame.mvKeysUn[mvIniMatches[ikp]];
+                float diff = (kp1.pt.x - kp2.pt.x)*(kp1.pt.x - kp2.pt.x) + (kp1.pt.y - kp2.pt.y)*(kp1.pt.y - kp2.pt.y);
+                if(diff < 16)
+                {
+                    mvIniMatches[ikp]=-1;
+                    continue;
+                }
 
                 //cv::line(mInitialFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
                 //cv::line(mCurrentFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
@@ -482,7 +497,10 @@ void Tracking::Initialization()
                 const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
 
                 if (cosParallaxRays < 0 || cosParallaxRays > 0.9998)
+                {
+                    mvIniMatches[ikp]=-1;
                     continue;
+                }
 
                 // Linear Triangulation Method
                 cv::Mat A(4, 4, CV_32F);
@@ -497,7 +515,10 @@ void Tracking::Initialization()
                 cv::Mat x3D = vt.row(3).t();
 
                 if (x3D.at<float>(3) == 0)
+                {
+                    mvIniMatches[ikp]=-1;
                     continue;
+                }
 
                 // Euclidean coordinates
                 x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
@@ -506,17 +527,37 @@ void Tracking::Initialization()
                 //Check triangulation in front of cameras
                 float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
                 if (z1 <= 0)
+                {
+                    mvIniMatches[ikp]=-1;
                     continue;
+                }
 
                 float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
                 if (z2 <= 0)
+                {
+                    mvIniMatches[ikp]=-1;
                     continue;
+                }
+
+
+                if (x3Dt.at<float>(2) < 1 && x3Dt.at<float>(2) > 20)
+                {
+                    mvIniMatches[ikp]=-1;
+                    continue;
+                }
+
+                //cout<<ikp<<":"<<x3Dt<<endl;
                 mvIniP3D[ikp] = cv::Point3f(x3Dt.at<float>(0), x3Dt.at<float>(1), x3Dt.at<float>(2));
                 //printf("init point %5.3f %5.3f %5.3f\n",x3Dt.at<float>(0),x3Dt.at<float>(1),x3Dt.at<float>(2));
             }
             //cv::imwrite("left.png",mInitialFrame.im);
             //cv::imwrite("right.png",mCurrentFrame.im);
-            CreateInitialMap(Rcw1, tcw1);
+
+                        // Set Frame Poses
+            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
+            mCurrentFrame.SetPose(Tcw2);
+
+            CreateInitialMap();
             cout << "My Initial OK!" << endl;
         }
     }
@@ -536,12 +577,11 @@ void Tracking::CreateInitialMap()
 
         //Create MapPoint.
         cv::Mat worldPos(mvIniP3D[i]);
-
+                
         MapPoint* pMP = new MapPoint(worldPos,pKFcur);
 
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
-
         pMP->AddObservation(pKFini,i);
         pMP->AddObservation(pKFcur,mvIniMatches[i]);
 
@@ -612,8 +652,10 @@ bool Tracking::TrackReferenceKeyFrame()
     ORBmatcher matcher(0.7,true);
     vector<MapPoint*> vpMapPointMatches;
     int nmatches = matcher.SearchNearby(mpReferenceKF, mCurrentFrame);
-
     //int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
+    //int nhave = mpReferenceKF->TrackedMapPoints(1);
+    //printf("have %d points in TrackReferenceKeyFrame\n",nhave);
+    //printf("nmatches %d in TrackReferenceKeyFrame\n",nmatches);
 
     if(nmatches<15)
         return false;
@@ -670,6 +712,7 @@ void Tracking::CreateNewKeyFrame()
     KeyFrame* pKF = new KeyFrame(mCurrentFrame);
     pKF->ChangeParent(mpReferenceKF);
     mpReferenceKF = pKF;
+    //printf("new mpReferenceKF %ld\n",mpReferenceKF->mnId);
     mCurrentFrame.mpReferenceKF = pKF;
 
     mpLocalMapper->InsertKeyFrame(pKF);
@@ -708,6 +751,7 @@ bool Tracking::TrackLocalMap()
             }
         }
     }
+    
     // Decide if the tracking was succesful
     //printf("mnMatchesInliers:%ld\n",mnMatchesInliers);
     if(mnMatchesInliers<30)

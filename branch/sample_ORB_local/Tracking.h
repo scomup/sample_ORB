@@ -172,6 +172,8 @@ protected:
     list<MapPoint*> mlpTemporalPoints;
 
     std::mutex mMutexLocalKeyFrames;
+
+    cv::Vec3f mDiffPose;
 };
 
 } //namespace ORB_SLAM

@@ -42,13 +42,27 @@ void LocalMapping::Run()
     {
         if (CheckNewKeyFrames())
         {
+            //auto start = std::chrono::system_clock::now(); 
             ProcessNewKeyFrame();
+            //auto end = std::chrono::system_clock::now();  
+            //auto dur = end - start;        // 要した時間を計算
+            //auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
+            //std::cout << msec << " milli sec \n";
+            
+            auto start1 = std::chrono::system_clock::now(); 
             CreateNewMapPoints();
+            auto end1 = std::chrono::system_clock::now();  
+            auto dur1 = end1 - start1;        // 要した時間を計算
+            auto msec1 = std::chrono::duration_cast<std::chrono::milliseconds>(dur1).count();
+            std::cout << msec1 << " milli sec \n";
+ 
             bool mbAbortBA = 0;
-            if (mlpLocalKeyFrames.size() > 2)
-                Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, mlpLocalKeyFrames, &mbAbortBA);
+            if(!CheckNewKeyFrames())
+            {
+                if (mlpLocalKeyFrames.size() > 2)
+                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, mlpLocalKeyFrames, &mbAbortBA);
+            }
         }
-         usleep(3000);
     }
 }
 
@@ -76,7 +90,8 @@ void LocalMapping::ProcessNewKeyFrame()
     unique_lock<mutex> lock(mMutexNewKFs);
     mpCurrentKeyFrame = mlNewKeyFrames.front();
     mlNewKeyFrames.pop_front();
-    mlpLocalKeyFrames.push_back(mpCurrentKeyFrame);
+    mlpLocalKeyFrames.clear();
+    //mlpLocalKeyFrames.push_back(mpCurrentKeyFrame);
     
 
     KeyFrame* pKF = mpCurrentKeyFrame;
@@ -109,10 +124,8 @@ void LocalMapping::ProcessNewKeyFrame()
 
 void LocalMapping::CreateNewMapPoints()
 {
-    // Retrieve neighbor keyframes in covisibility graph
-    int nn = 10;
-    //if(mbMonocular)
-        nn=20;
+
+
     std::vector<KeyFrame*> vpNeighKFs(mlpLocalKeyFrames.begin(), mlpLocalKeyFrames.end());
     ORBmatcher matcher(0.6,false);
 
@@ -149,13 +162,10 @@ void LocalMapping::CreateNewMapPoints()
         const float baseline = cv::norm(vBaseline);
 
         
-        /*{
-            const float medianDepthKF2 = pKF2->ComputeSceneMedianDepth(2);
-            const float ratioBaselineDepth = baseline/medianDepthKF2;
-
-            if(ratioBaselineDepth<0.01)
+        {
+            if(baseline<0.1 && baseline > 5)
                 continue;
-        }*/
+        }
 
         // Compute Fundamental Matrix
         cv::Mat F12 = ComputeF12(mpCurrentKeyFrame,pKF2);
@@ -163,7 +173,16 @@ void LocalMapping::CreateNewMapPoints()
         // Search matches that fullfil epipolar constraint
         vector<pair<size_t,size_t> > vMatchedIndices;
        
+        //auto start1 = std::chrono::system_clock::now(); 
+
+
+
         matcher.SearchForTriangulation(mpCurrentKeyFrame,pKF2,F12,vMatchedIndices);
+
+        //auto end1 = std::chrono::system_clock::now();  
+        //auto dur1 = end1 - start1;        // 要した時間を計算
+        //auto msec1 = std::chrono::duration_cast<std::chrono::milliseconds>(dur1).count();
+        //std::cout <<i<<":"<< msec1 << " milli sec \n";
 
         cv::Mat Rcw2 = pKF2->GetRotation();
         cv::Mat Rwc2 = Rcw2.t();

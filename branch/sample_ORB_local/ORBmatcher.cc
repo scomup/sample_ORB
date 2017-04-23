@@ -222,6 +222,9 @@ int ORBmatcher::SearchNearby(KeyFrame *pKF, Frame &F)
                 if (bestDist <= ORBdist)
                 {
                     F.mvpMapPoints[bestIdx2] = pMP;
+                    //std::cout <<"x = " << pMP->GetWorldPos() << std::endl;
+                    //std::cout <<"iD = " << bestIdx2 << std::endl;
+
                     nmatches++;
 
                     if (mbCheckOrientation)

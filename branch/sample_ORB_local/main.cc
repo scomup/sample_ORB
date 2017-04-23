@@ -15,6 +15,9 @@
 
 #include "LocalMapping.h"
 #include "Tracking.h"
+#include <Eigen/Core>
+#include <Eigen/LU>
+
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
 
@@ -47,6 +50,24 @@ public:
 
 int main(int argc, char **argv)
 {
+
+Eigen::Matrix<double, 3, 3> H = Eigen::MatrixXd::Zero(3,3);
+
+//Eigen::MatrixXd A(3,3);
+H << 1.95582e+07 ,0,332556,  0,1.95582e+07,433880, 332556,433880, 1.83893e+07;
+cout <<"H = " << endl << H << endl;
+
+Eigen::Matrix<double, 3, 1> B = Eigen::MatrixXd::Zero(3,1);
+B << 3660.29
+,465588
+,-86473.3
+;
+cout <<"B = " << endl << B << endl;
+
+Eigen::VectorXd x = H.fullPivLu().solve(-B);
+
+cout <<"x = " << endl << x << endl;
+//return 0;
     ros::init(argc, argv, "Mono");
     ros::start();
 
@@ -64,9 +85,33 @@ int main(int argc, char **argv)
 
     ros::NodeHandle nodeHandler;
     ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 1, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("myRobot/cmd_vel", 100, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
+
+    /*
+    for (int ni = 15; ni < 30; ni++)
+    {
+        usleep(333333);
+        cv::Vec3f    mOdom; 
+        mOdom[0] = 0;
+        mOdom[1] = 0.11;
+        mOdom[2] = 0;
+
+        std::string str = (boost::format("/home/liu/workspace/sample_ORB/data/frame%04d.jpg") % ni).str();
+        std::cout<<str<<std::endl;
+        cv::Mat img = cv::imread(str);
+        if (img.empty())
+        {
+            cerr << endl
+                 << "Failed to load image at: " << str << endl;
+            return 1;
+        }
+        pTracker->GrabImage(img, mOdom,0);
+        pLocalMapper->Run();
+    }*/
+
+
     ros::shutdown();
     th0.join();
     th1.join();

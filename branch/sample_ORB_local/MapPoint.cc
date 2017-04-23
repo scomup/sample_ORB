@@ -96,7 +96,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
     std::unique_lock<std::mutex> lock(mMutexFeatures);
     if(mObservations.count(pKF))
     {
-        int idx = mObservations[pKF];
+        //int idx = mObservations[pKF];
         mObservations.erase(pKF);
         if(mpRefKF==pKF)
             mpRefKF=mObservations.begin()->first;
