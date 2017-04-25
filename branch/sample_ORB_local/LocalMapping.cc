@@ -59,7 +59,7 @@ void LocalMapping::Run()
             bool mbAbortBA = 0;
             if(!CheckNewKeyFrames())
             {
-                if (mlpLocalKeyFrames.size() > 2)
+                if (mlpLocalKeyFrames.size() > 5)
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, mlpLocalKeyFrames, &mbAbortBA);
             }
         }

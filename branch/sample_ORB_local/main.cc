@@ -29,7 +29,7 @@ class localSlamRunner
 
 public:
 
-    localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0){
+    localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
         
 
     }
@@ -85,7 +85,7 @@ cout <<"x = " << endl << x << endl;
 
     ros::NodeHandle nodeHandler;
     ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("myRobot/cmd_vel", 100, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 100, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 

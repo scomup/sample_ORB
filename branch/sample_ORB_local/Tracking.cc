@@ -287,6 +287,7 @@ void Tracking::Track()
                 mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
                 mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
                 mVelocity = mCurrentFrame.mTcw * LastTwc;
+
             }
             else
                 mVelocity = cv::Mat();
@@ -325,7 +326,10 @@ bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
 
-    mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+    //cout<<mVelocity<<endl;
+    //cout<<mLastFrame.mTcw<<endl;
+    //cout<<mVelocity*mLastFrame.mTcw<<endl;
+    mCurrentFrame.SetPose(mLastFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -653,11 +657,11 @@ bool Tracking::TrackReferenceKeyFrame()
     vector<MapPoint*> vpMapPointMatches;
     int nmatches = matcher.SearchNearby(mpReferenceKF, mCurrentFrame);
     //int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
-    //int nhave = mpReferenceKF->TrackedMapPoints(1);
-    //printf("have %d points in TrackReferenceKeyFrame\n",nhave);
-    //printf("nmatches %d in TrackReferenceKeyFrame\n",nmatches);
+    int nhave = mpReferenceKF->TrackedMapPoints(1);
+    printf("have %d points in TrackReferenceKeyFrame\n",nhave);
+    printf("nmatches %d in TrackReferenceKeyFrame\n",nmatches);
 
-    if(nmatches<15)
+    if(nmatches<50)
         return false;
 
     mCurrentFrame.SetPose(mLastFrame.mTcw);
