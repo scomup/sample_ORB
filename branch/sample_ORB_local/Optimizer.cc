@@ -52,7 +52,7 @@ class PoseSolver
 {
   public:
     PoseSolver(Frame *pFrame);
-    int Solve();
+    int Solve(float maxe);
     cv::Mat  Draw();
 
 
@@ -67,8 +67,8 @@ class PoseSolver
     double mCx;
     double mCy;
     double mYawc;
-    double mXc;
-    double mYc;
+    double mXw;
+    double mYw;
     double mDyaww;
     double mDxw;
     double mDyw;
@@ -77,7 +77,6 @@ class PoseSolver
 
 PoseSolver::PoseSolver(Frame *pFrame) : mpFrame(pFrame)
 {
-    ReadDataFromFrame();
 }
 
 Eigen::Matrix<double, 2, 3> PoseSolver::Jacobiani(cv::Mat point)
@@ -90,10 +89,10 @@ Eigen::Matrix<double, 2, 3> PoseSolver::Jacobiani(cv::Mat point)
     double cosY = cos(mYawc - mDyaww);
     J << (mFx / z)*cosY,
         -(mFx / z)*sinY,
-        -(mFx / z)*sinY * (x - mDxw) - (mFx / z) * cosY * (y - mDyw),
+        -(mFx / z)*sinY * (x - mDxw - mXw) - (mFx / z) * cosY * (y - mDyw - mYw),
          (mFy / z)*sinY,
          (mFy / z)*cosY,
-         (mFy / z) * cosY * (x - mDxw) - (mFy / z) * sinY * (y - mDyw);
+         (mFy / z)*cosY * (x - mDxw - mXw) - (mFy / z) * sinY * (y - mDyw - mYw);
     return J;
 }
 
@@ -106,15 +105,15 @@ Eigen::Matrix<double, 2, 1> PoseSolver::Errori(cv::Mat point, double u, double v
     double sinY = sin(mYawc - mDyaww);
     double cosY = cos(mYawc - mDyaww);
 
-    ei << u - (mFx / z) * (cosY * (x - mDxw) - sinY * (y - mDyw) + mXc) - mCx,
-          v - (mFy / z) * (sinY * (x - mDxw) + cosY * (y - mDyw) + mYc) - mCy;
+    ei << u - (mFx / z) * (cosY * (x - mDxw - mXw) - sinY * (y - mDyw - mYw)) - mCx,
+          v - (mFy / z) * (sinY * (x - mDxw - mXw) + cosY * (y - mDyw - mYw)) - mCy;
     return ei;
 }
 
 double PoseSolver::TotalError()
 {
     double tot_error = 0;
-    Eigen::Matrix<double, 2, 1> E = Eigen::MatrixXd::Zero(2,1);
+    //Eigen::Matrix<double, 2, 1> E = Eigen::MatrixXd::Zero(2,1);
 
     const int N = mpFrame->N;
     for (int i = 0; i < N; i++)
@@ -124,7 +123,7 @@ double PoseSolver::TotalError()
         {
             const cv::KeyPoint &kpUn = mpFrame->mvKeysUn[i];
             Eigen::Matrix<double, 2, 1> Ei = Errori(pMP->GetWorldPos(), kpUn.pt.x, kpUn.pt.y);
-            E = Ei + E;
+            //E = Ei + E;
             double E2 = Ei.transpose() * Ei;
             tot_error = tot_error + E2;
         }
@@ -136,16 +135,18 @@ void PoseSolver::Update()
 {
     cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -mDyaww);
     cv::Mat Tcw = mpFrame-> mTcw.clone();
-    cv::Mat Rcw = Tcw.rowRange(0,3).colRange(0,3);
-    Rcw = Rcw * DRcw;
-    cv::Mat dtwc = (cv::Mat_<float>(3,1) << mDxw,mDyw,0);
-    cv::Mat dtcw = -Rcw*dtwc;
-    Tcw.at<float>(0,3) += dtcw.at<float>(0);
-    Tcw.at<float>(1,3) += dtcw.at<float>(1);
-    std::cout<<mpFrame->GetCameraCenter()<<std::endl;
-    mpFrame->SetPose(Tcw);
+    cv::Mat RcwOld = Tcw.rowRange(0,3).colRange(0,3);
+    cv::Mat Rcw = RcwOld * DRcw;
+    mpFrame->mRcw = Rcw;
+    mpFrame->mRwc = Rcw.t();
+    mpFrame->mtwc.at<float>(0) +=  mDxw;
+    mpFrame->mtwc.at<float>(1) +=  mDyw;
+    //tcw = -mRwc.t()*mtwc;
+    mpFrame->mtcw = -Rcw*mpFrame->mtwc;
+    mpFrame->mtcw.copyTo(mpFrame->mTcw.rowRange(0,3).col(3));
+    Rcw.copyTo(mpFrame->mTcw.rowRange(0,3).colRange(0,3));
+
     printf("dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
-    std::cout<<mpFrame->GetCameraCenter()<<std::endl;
 
 
 }
@@ -183,10 +184,11 @@ cv::Mat PoseSolver::Draw()
 
     return img;
 }
-int PoseSolver::Solve()
+int PoseSolver::Solve(float maxe)
 {   
-    cv::Mat bef = Draw();
-    cv::imshow("bef",bef);
+    ////cv::Mat bef = Draw();
+    //cv::imshow("bef",bef);
+    ReadDataFromFrame();
     const int N = mpFrame->N;
     double last_error = 100000000000;
     int n = 0;
@@ -204,7 +206,7 @@ int PoseSolver::Solve()
                 Eigen::Matrix<double, 2, 3> Ji = Jacobiani(pMP->GetWorldPos());
                 Eigen::Matrix<double, 2, 1> Ei = Errori(pMP->GetWorldPos(), kpUn.pt.x, kpUn.pt.y);
                 double E2 = Ei.transpose() * Ei;
-                if(E2 > 1000){
+                if(E2 > maxe){
                     mpFrame->mvbOutlier[i] = true;
                     continue;
                 }
@@ -263,9 +265,9 @@ int PoseSolver::Solve()
             last_error = tot_error;
         }
     }
-     Update();
-    cv::Mat aft = Draw();
-    cv::imshow("aft",aft);
+    Update();
+    //cv::Mat aft = Draw();
+    //cv::imshow("aft",aft);
     //cv::waitKey(300);
      //cv::Mat twc = mpFrame->GetCameraCenter();
      //std::cout<<twc<<std::endl;
@@ -279,11 +281,11 @@ void PoseSolver::ReadDataFromFrame()
     mCx = mpFrame->cx;
     mCy = mpFrame->cy;
     cv::Mat Rcw = mpFrame->mTcw.rowRange(0,3).colRange(0,3);
-    cv::Mat tcw = mpFrame->mTcw.rowRange(0,3).col(3);
+    cv::Mat twc = mpFrame->GetCameraCenter();
     float pitch, roll, yaw;
     Converter::computeAnglesFromMatrix(Rcw, pitch, roll, yaw);
-    mXc = tcw.at<float>(0);
-    mYc = tcw.at<float>(1);
+    mXw = twc.at<float>(0);
+    mYw = twc.at<float>(1);
     //std::cout<<tcw<<std::endl;
     mYawc = (float)yaw;
     mDyaww = 0;
@@ -299,8 +301,10 @@ using namespace std;
 
 int Optimizer::PoseOptimization(Frame *pFrame)
 {
-    PoseSolver solver(pFrame);
-    int n = solver.Solve();
+    PoseSolver solver1(pFrame);
+    int n = solver1.Solve(300);
+    PoseSolver solver2(pFrame);
+    solver2.Solve(50);
     //cv::Mat twc = pFrame->GetCameraCenter();
     //std::cout<<twc<<std::endl;
     return n;
@@ -700,3 +704,4 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, list<KeyFrame *> lLocalKeyF
 }
 
 } //namespace ORB_SLAM
+
