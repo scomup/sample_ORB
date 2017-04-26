@@ -1,4 +1,4 @@
-﻿/**
+/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -69,9 +69,9 @@ class PoseSolver
     double mYawc;
     double mXc;
     double mYc;
-    double mDyaww;
-    double mDxw;
-    double mDyw;
+    double mDyawc;
+    double mDxc;
+    double mDyc;
     Frame *mpFrame;
 };
 
@@ -86,14 +86,14 @@ Eigen::Matrix<double, 2, 3> PoseSolver::Jacobiani(cv::Mat point)
     double y = point.at<float>(1);
     double z = point.at<float>(2);
     Eigen::Matrix<double, 2, 3> J;
-    double sinY = sin(mYawc - mDyaww);
-    double cosY = cos(mYawc - mDyaww);
-    J << (mFx / z)*cosY,
-        -(mFx / z)*sinY,
-        -(mFx / z)*sinY * (x - mDxw) - (mFx / z) * cosY * (y - mDyw),
-         (mFy / z)*sinY,
-         (mFy / z)*cosY,
-         (mFy / z) * cosY * (x - mDxw) - (mFy / z) * sinY * (y - mDyw);
+    double sinY = sin(mYawc + mDyawc);
+    double cosY = cos(mYawc + mDyawc);
+    J << -(mFx / z),
+        0,
+        (mFx / z) * sinY * x + (mFx / z) * cosY * y,
+        0,
+        -(mFy / z),
+        -(mFy / z) * cosY * x + (mFy / z) * sinY * y;
     return J;
 }
 
@@ -103,11 +103,11 @@ Eigen::Matrix<double, 2, 1> PoseSolver::Errori(cv::Mat point, double u, double v
     double x = point.at<float>(0);
     double y = point.at<float>(1);
     double z = point.at<float>(2);
-    double sinY = sin(mYawc - mDyaww);
-    double cosY = cos(mYawc - mDyaww);
+    double sinY = sin(mYawc + mDyawc);
+    double cosY = cos(mYawc + mDyawc);
 
-    ei << u - (mFx / z) * (cosY * (x - mDxw) - sinY * (y - mDyw) + mXc) - mCx,
-          v - (mFy / z) * (sinY * (x - mDxw) + cosY * (y - mDyw) + mYc) - mCy;
+    ei << u - (mFx / z) * ( cosY * x - sinY * y + mXc + mDxc) - mCx,
+          v - (mFy / z) * ( sinY * x + cosY * y + mYc + mDyc) - mCy;
     return ei;
 }
 
@@ -134,19 +134,14 @@ double PoseSolver::TotalError()
 
 void PoseSolver::Update()
 {
-    cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -mDyaww);
-    cv::Mat Tcw = mpFrame-> mTcw.clone();
+    cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, mDyawc);
+    cv::Mat Tcw = mpFrame->mTcw.clone();
     cv::Mat Rcw = Tcw.rowRange(0,3).colRange(0,3);
     Rcw = Rcw * DRcw;
-    cv::Mat dtwc = (cv::Mat_<float>(3,1) << mDxw,mDyw,0);
-    cv::Mat dtcw = -Rcw*dtwc;
-    Tcw.at<float>(0,3) += dtcw.at<float>(0);
-    Tcw.at<float>(1,3) += dtcw.at<float>(1);
-    std::cout<<mpFrame->GetCameraCenter()<<std::endl;
+    Tcw.at<float>(0,3) += mDxc;
+    Tcw.at<float>(1,3) += mDyc;
     mpFrame->SetPose(Tcw);
-    printf("dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
-    std::cout<<mpFrame->GetCameraCenter()<<std::endl;
-
+    printf("dx:%f dy:%f dyaw%f\n",mDxc,mDyc,mDyawc);
 
 }
 
@@ -227,9 +222,9 @@ int PoseSolver::Solve()
         //std::cout << "============================" << std::endl;
         double tot_error1 = TotalError();
         //printf("================\nbef:%f\n", tot_error);
-        mDxw += arg(0, 0);
-        mDyw += arg(1, 0);
-        mDyaww += arg(2, 0);
+        mDxc += arg(0, 0);
+        mDyc += arg(1, 0);
+        mDyawc += arg(2, 0);
         //for (int i = 0; i < N; i++)
         //{
         //    MapPoint *pMP = mpFrame->mvpMapPoints[i];
@@ -286,9 +281,9 @@ void PoseSolver::ReadDataFromFrame()
     mYc = tcw.at<float>(1);
     //std::cout<<tcw<<std::endl;
     mYawc = (float)yaw;
-    mDyaww = 0;
-    mDxw = 0;
-    mDyw = 0;
+    mDyawc = 0;
+    mDxc = 0;
+    mDyc = 0;
 }
 }
 
@@ -700,3 +695,4 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, list<KeyFrame *> lLocalKeyF
 }
 
 } //namespace ORB_SLAM
+

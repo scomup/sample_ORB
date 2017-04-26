@@ -12,15 +12,15 @@
 #include <nav_msgs/Odometry.h>
 #include "geometry_msgs/Twist.h"
 #include <tf/transform_datatypes.h>
-
+#include <math.h>
 #include "LocalMapping.h"
 #include "Tracking.h"
-#include <Eigen/Core>
-#include <Eigen/LU>
 
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
 
+#define CAMERA_X -0.05
+#define CAMERA_Y 0.175
 using namespace std;
 using namespace sample_ORB;
 
@@ -31,7 +31,7 @@ public:
 
     localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
         
-
+        mTheta = atan2(CAMERA_X,CAMERA_Y);
     }
 
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
@@ -46,28 +46,12 @@ public:
     double  mTimeStamp;
     double  mV;
     double  mYawRate;
+    double  mTheta;
 };
 
 int main(int argc, char **argv)
 {
 
-Eigen::Matrix<double, 3, 3> H = Eigen::MatrixXd::Zero(3,3);
-
-//Eigen::MatrixXd A(3,3);
-H << 1.95582e+07 ,0,332556,  0,1.95582e+07,433880, 332556,433880, 1.83893e+07;
-cout <<"H = " << endl << H << endl;
-
-Eigen::Matrix<double, 3, 1> B = Eigen::MatrixXd::Zero(3,1);
-B << 3660.29
-,465588
-,-86473.3
-;
-cout <<"B = " << endl << B << endl;
-
-Eigen::VectorXd x = H.fullPivLu().solve(-B);
-
-cout <<"x = " << endl << x << endl;
-//return 0;
     ros::init(argc, argv, "Mono");
     ros::start();
 
@@ -84,8 +68,8 @@ cout <<"x = " << endl << x << endl;
     
 
     ros::NodeHandle nodeHandler;
-    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 100, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1000, &localSlamRunner::GrabImage, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 1000, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 
@@ -139,9 +123,8 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     mTimeStamp = msg->header.stamp.toSec();
     double deltaTimeStamp = mTimeStamp - preTimeStamp;
-
-    mOdom[0] = 0;
-    mOdom[1] = mV*deltaTimeStamp;
+    mOdom[0] = 0 + cos(mTheta)*mYawRate*CAMERA_Y*deltaTimeStamp ;
+    mOdom[1] = mV*deltaTimeStamp + sin(mTheta)*mYawRate*CAMERA_Y*deltaTimeStamp;
     mOdom[2] = mYawRate*deltaTimeStamp;
 
     // cout<<"====================="<<endl;

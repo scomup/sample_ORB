@@ -329,6 +329,8 @@ bool Tracking::TrackWithMotionModel()
     //cout<<mVelocity<<endl;
     //cout<<mLastFrame.mTcw<<endl;
     //cout<<mVelocity*mLastFrame.mTcw<<endl;
+    //cv::Mat V = mVelocity.clone();
+    //V= V*mLastFrame.mTcw;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
@@ -442,14 +444,14 @@ void Tracking::Initialization()
         cv::Mat Rwc2 = Ric;
         cv::Mat tcw2 = -Rcw2*(cv::Mat_<float>(3,1) << mDiffPose[0], mDiffPose[1], 0);
 
-        cv::Mat Tcw2(3, 4, CV_32F);
-        Rcw2.copyTo(Tcw2.colRange(0, 3));
-        tcw2.copyTo(Tcw2.col(3));
+        cv::Mat Tcw2 = cv::Mat::eye(4,4,CV_32F);
+        Rcw2.copyTo(Tcw2.rowRange(0,3).colRange(0, 3));
+        tcw2.copyTo(Tcw2.rowRange(0, 3).col(3));
 
         cv::Mat Rcw1 = cv::Mat::eye(3, 3, CV_32F);
         cv::Mat Rwc1 = cv::Mat::eye(3, 3, CV_32F);
         cv::Mat tcw1 = cv::Mat::zeros(3, 1, CV_32F);
-        cv::Mat Tcw1 = cv::Mat::eye(3, 4, CV_32F);
+        cv::Mat Tcw1 = cv::Mat::eye(4, 4, CV_32F);
 
         const float fx2 = mCurrentFrame.fx;
         const float fy2 = mCurrentFrame.fy;
@@ -698,7 +700,7 @@ bool Tracking::NeedNewKeyFrame()
     int nRefMatches = mpReferenceKF->TrackedMapPoints(1);
 
     const bool c = (mnMatchesInliers<nRefMatches*0.6 );
-    if(c)
+    if(c && mCurrentFrame.mOdom[2] < 0.001)
     {
         return true;
     }

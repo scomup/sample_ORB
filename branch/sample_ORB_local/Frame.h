@@ -143,6 +143,11 @@ public:
 
     static bool mbInitialComputations;
 
+    // Rotation, translation and camera center
+    cv::Mat mRcw;
+    cv::Mat mtcw;
+    cv::Mat mRwc;
+    cv::Mat mtwc;
 
 private:
 
@@ -157,11 +162,6 @@ private:
     // Assign keypoints to the grid for speed up feature matching (called in the constructor).
     void AssignFeaturesToGrid();
 
-    // Rotation, translation and camera center
-    cv::Mat mRcw;
-    cv::Mat mtcw;
-    cv::Mat mRwc;
-    cv::Mat mtwc;
 };
 
 }

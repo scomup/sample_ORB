@@ -193,38 +193,26 @@ void Drawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 void Drawer::DrawMapPoints()
 {
     const std::vector<MapPoint*> &vpMPs = mvpLocalMapPoints;
-    const std::vector<MapPoint*> &vpRefMPs = mvpLocalMapPoints;
+    //const std::vector<MapPoint*> &vpRefMPs = mvpLocalMapPoints;
 
-    std::set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
+    //std::set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
     if(vpMPs.empty())
         return;
 
     glPointSize(mPointSize);
     glBegin(GL_POINTS);
-    glColor3f(1.0,1.0,1.0);
+    glColor3f(1.0,0.0,0.0);
 
     for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
     {
-        if(spRefMPs.count(vpMPs[i]))
-            continue;
+        //if(spRefMPs.count(vpMPs[i]))
+        //    continue;
         cv::Mat pos = vpMPs[i]->GetWorldPos();
         glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
     }
     glEnd();
 
-    glPointSize(mPointSize);
-    glBegin(GL_POINTS);
-    glColor3f(1.0,0.0,0.0);
-
-    for(std::set<MapPoint*>::iterator sit=spRefMPs.begin(), send=spRefMPs.end(); sit!=send; sit++)
-    {
-        cv::Mat pos = (*sit)->GetWorldPos();
-        glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
-
-    }
-
-    glEnd();
 }
 void Drawer::SetDrawer(cv::Mat& CameraPose, std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints){
     mCameraPose = CameraPose;
