@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   rospy
   std_msgs
+  tf
 )
 
 
@@ -15,13 +16,13 @@ include_directories(include
   ${OpenCV_INCLUDE_DIRS})
 
 
-#SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O0 -march=native -std=c++0x")
-#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O0 -march=native -std=c++0x")
-#SET(CMAKE_BUILD_TYPE Debug)
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O0 -march=native -std=c++0x")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O0 -march=native -std=c++0x")
+SET(CMAKE_BUILD_TYPE Debug)
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native -std=c++0x")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native -std=c++0x")
-SET(CMAKE_BUILD_TYPE Release)
+#SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native -std=c++0x")
+#SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native -std=c++0x")
+#SET(CMAKE_BUILD_TYPE Release)
 
 find_package(OpenCV 2.4.3 REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -42,7 +43,6 @@ main.cc
 ORBextractor.cc
 Frame.cc
 ORBmatcher.cc
-Initializer.cc
 Drawer.cc
 KeyFrame.cc
 MapPoint.cc

@@ -27,7 +27,6 @@
 
 #include"ORBmatcher.h"
 #include"Drawer.h"
-#include"Initializer.h"
 #include"Optimizer.h"
 #include "Converter.h"
 
@@ -43,7 +42,6 @@ namespace sample_ORB
 
 Tracking::Tracking(Drawer *pDrawer,  const string &strSettingPath):
     mState(NO_IMAGES_YET),
-    mpInitializer(static_cast<Initializer*>(NULL)),
     mpDrawer(pDrawer)
 {
     // Load camera parameters from settings file
@@ -137,6 +135,18 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 cv::Mat Tracking::GrabImage(const cv::Mat &im, cv::Vec3f odom, const double &timestamp)
 {
     mImGray = im;
+
+    if (!mLastFrame.mTcw.empty())
+    {
+        cv::Mat Rcw = mLastFrame.mTcw.rowRange(0, 3).colRange(0, 3);
+        cv::Mat v = (cv::Mat_<float>(3, 1) << odom[0], odom[1], 0);
+        v = Rcw * v;
+        printf("odom:dx:%f dy:%f dyaw%f\n", v.at<float>(0), v.at<float>(1), odom[2]);
+    }
+    //float pitch, roll, yaw;
+    //Converter::computeAnglesFromMatrix(Rcw, pitch, roll, yaw);
+    //cv::Mat Ric = Converter::computeMatrixFromAngles(0, 0, mDiffPose[2]);
+
 
     if(mImGray.channels()==3)
     {
@@ -377,8 +387,9 @@ bool Tracking::TrackWithMotionModel()
 
 void Tracking::Initialization()
 {
+    static bool flag = false;
 
-    if (!mpInitializer)
+    if (!flag)
     {
         // Set Reference Frame
         mDiffPose[0] = 0;
@@ -392,10 +403,8 @@ void Tracking::Initialization()
             for (size_t i = 0; i < mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
 
-            if (mpInitializer)
-                delete mpInitializer;
 
-            mpInitializer = new Initializer(mCurrentFrame, 1.0, 200);
+            flag = true;
 
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
 
@@ -407,8 +416,7 @@ void Tracking::Initialization()
         // Try to initialize
         if ((int)mCurrentFrame.mvKeys.size() <= 50)
         {
-            delete mpInitializer;
-            mpInitializer = static_cast<Initializer *>(NULL);
+            flag = false;
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
             return;
         }
@@ -424,16 +432,7 @@ void Tracking::Initialization()
             return;
         }
         mDiffPose[2] += mCurrentFrame.mOdom[2];
-        /*
-        if (yaw_ci < -PI)
-        {
-            yaw_ci += 2 * PI;
-        }
-        else if (yaw_ci > PI)
-        {
-            yaw_ci -= 2 * PI;
-        }
-        */
+
         cv::Mat Ric = Converter::computeMatrixFromAngles(0, 0, mDiffPose[2]);
         cv::Mat dtic = Ric*(cv::Mat_<float>(3,1) << mCurrentFrame.mOdom[0], mCurrentFrame.mOdom[1], 0);
         mDiffPose[0] +=dtic.at<float>(0);
@@ -473,7 +472,7 @@ void Tracking::Initialization()
         double base_line = cv::norm(tcw2);
         //printf("%f\n",base_line);
         //printf("tfi->x:%5.3f y:%5.3f z:%5.3f yaw:%5.3f\n",-transpose.y(), transpose.x(), transpose.z(), mCurrentFrame.mYaw);
-        if (base_line > 0.1)
+        if (base_line > 0.2)
         {
             mvIniP3D.resize(mvIniMatches.size());
             for (size_t ikp = 0, iendkp = mvIniMatches.size(); ikp < iendkp; ikp++)

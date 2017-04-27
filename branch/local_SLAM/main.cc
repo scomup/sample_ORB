@@ -5,6 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <thread>
+#include <string>
 #include <boost/format.hpp> 
 #include <cmath>
 #include<ros/ros.h>
@@ -15,6 +16,7 @@
 #include <math.h>
 #include "LocalMapping.h"
 #include "Tracking.h"
+#include <tf/transform_broadcaster.h>
 
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
@@ -32,6 +34,9 @@ public:
     localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
         
         mTheta = atan2(CAMERA_X,CAMERA_Y);
+        tf::Transform tfT;
+        tfT.setIdentity();
+        mTfBr.sendTransform(tf::StampedTransform(tfT,ros::Time::now(), "/ORB_SLAM/World", "/ORB_SLAM/Camera"));  
     }
 
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
@@ -41,12 +46,13 @@ public:
 
     Tracking*       mpTracker;
     bool            mbFirstImg;
-
+    
     cv::Vec3f    mOdom; 
     double  mTimeStamp;
     double  mV;
     double  mYawRate;
     double  mTheta;
+    tf::TransformBroadcaster mTfBr;
 };
 
 int main(int argc, char **argv)
@@ -68,8 +74,8 @@ int main(int argc, char **argv)
     
 
     ros::NodeHandle nodeHandler;
-    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1000, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 1000, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 1, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 
@@ -131,7 +137,19 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     cout<<"odom:"<<mOdom<<endl;
     mpTracker->GrabImage(cv_ptr->image, mOdom ,0);
     preTimeStamp = mTimeStamp;
+    cv::Mat Tcw = mpTracker->mCurrentFrame.mTcw;
 
+    if (Tcw.empty() != true)
+    {
+        cv::Mat Rwc = Tcw.rowRange(0, 3).colRange(0, 3).t();
+        cv::Mat twc = -Rwc * Tcw.rowRange(0, 3).col(3);
+        tf::Matrix3x3 M(Rwc.at<float>(0, 0), Rwc.at<float>(0, 1), Rwc.at<float>(0, 2),
+                        Rwc.at<float>(1, 0), Rwc.at<float>(1, 1), Rwc.at<float>(1, 2),
+                        Rwc.at<float>(2, 0), Rwc.at<float>(2, 1), Rwc.at<float>(2, 2));
+        tf::Vector3 V(twc.at<float>(0), twc.at<float>(1), twc.at<float>(2));
+        tf::Transform tfTcw(M, V);
+        mTfBr.sendTransform(tf::StampedTransform(tfTcw, ros::Time::now(), "ORB_SLAM/World", "ORB_SLAM/Camera"));
+    }
 }
 /*
 void localSlamRunner::GrabOdom(const nav_msgs::Odometry::ConstPtr &msg)

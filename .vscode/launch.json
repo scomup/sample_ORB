@@ -5,7 +5,7 @@
             "name": "C++ Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/branch/sample_ORB_local/build/local_SLAM",
+            "program": "${workspaceRoot}/branch/local_SLAM/build/local_SLAM",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceRoot}",

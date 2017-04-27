@@ -24,12 +24,11 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
-
+#include<string>
 #include "Drawer.h"
 #include "LocalMapping.h"
 #include "Frame.h"
 #include "ORBextractor.h"
-#include "Initializer.h"
 
 #include <mutex>
 
@@ -45,7 +44,7 @@ class Tracking
 
 public:
     Tracking(Drawer* pDrawer,
-              const string &strSettingPath);
+              const std::string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImage(const cv::Mat &im, cv::Vec3f mOdom ,const double &timestamp);
@@ -133,9 +132,6 @@ protected:
     ORBextractor* mpIniORBextractor;
 
 
-    // Initalization (only for monocular)
-    Initializer* mpInitializer;
-
     //Local Map
     KeyFrame* mpReferenceKF;
     std::list<KeyFrame*> mlpLocalKeyFrames;
@@ -168,8 +164,6 @@ protected:
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
-
-    list<MapPoint*> mlpTemporalPoints;
 
     std::mutex mMutexLocalKeyFrames;
 

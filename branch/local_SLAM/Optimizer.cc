@@ -146,7 +146,7 @@ void PoseSolver::Update()
     mpFrame->mtcw.copyTo(mpFrame->mTcw.rowRange(0,3).col(3));
     Rcw.copyTo(mpFrame->mTcw.rowRange(0,3).colRange(0,3));
 
-    printf("dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
+    printf("opt:dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
 
 
 }
@@ -227,7 +227,7 @@ int PoseSolver::Solve(float maxe)
         //std::cout << "arg = " << std::endl
         //          << arg << std::endl;
         //std::cout << "============================" << std::endl;
-        double tot_error1 = TotalError();
+        //double tot_error1 = TotalError();
         //printf("================\nbef:%f\n", tot_error);
         mDxw += arg(0, 0);
         mDyw += arg(1, 0);
