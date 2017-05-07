@@ -27,7 +27,7 @@
 namespace sample_ORB
 {
 
-LocalMapping::LocalMapping()
+LocalMapping::LocalMapping():mbFinished(false)
 {
     printf("Initial LocalMapping!\n");
 }
@@ -62,6 +62,11 @@ void LocalMapping::Run()
                 if (mlpLocalKeyFrames.size() > 5)
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, mlpLocalKeyFrames, &mbAbortBA);
             }
+
+        }
+        if (isFinished())
+        {
+            break;
         }
     }
 }
@@ -83,6 +88,19 @@ bool LocalMapping::CheckNewKeyFrames()
     unique_lock<mutex> lock(mMutexNewKFs);
     return(!mlNewKeyFrames.empty());
 }
+
+void LocalMapping::SetFinish()
+{
+    unique_lock<mutex> lock(mMutexFinish);
+    mbFinished = true;    
+}
+
+bool LocalMapping::isFinished()
+{
+    unique_lock<mutex> lock(mMutexFinish);
+    return mbFinished;
+}
+
 
 void LocalMapping::ProcessNewKeyFrame()
 {

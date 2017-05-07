@@ -44,6 +44,11 @@ public:
     void InsertKeyFrame(KeyFrame* pKF);
 
     void SetTracker(Tracking *pTracker);
+
+    void SetFinish();
+
+    bool isFinished();
+
     
 
 protected:
@@ -52,11 +57,11 @@ protected:
     void ProcessNewKeyFrame();
     void CreateNewMapPoints();
 
+
+
     cv::Mat ComputeF12(KeyFrame* &pKF1, KeyFrame* &pKF2);
 
     cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
-
-    std::mutex mMutexFinish;
 
     std::list<KeyFrame*> mlpLocalKeyFrames;
 
@@ -75,6 +80,11 @@ protected:
     std::mutex mMutexStop;
 
     Tracking* mpTracker;
+
+    bool mbFinished;
+    std::mutex mMutexFinish;
+
+
 
 };
 

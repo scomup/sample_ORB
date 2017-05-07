@@ -168,6 +168,10 @@ protected:
     std::mutex mMutexLocalKeyFrames;
 
     cv::Vec3f mDiffPose;
+
+    float mDt;
+
+    cv::Mat mTcwOdom;
 };
 
 } //namespace ORB_SLAM

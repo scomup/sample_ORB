@@ -21,8 +21,6 @@
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
 
-#define CAMERA_X -0.05
-#define CAMERA_Y 0.175
 using namespace std;
 using namespace sample_ORB;
 
@@ -33,7 +31,7 @@ public:
 
     localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
         
-        mTheta = atan2(CAMERA_X,CAMERA_Y);
+        //mTheta = atan2(CAMERA_X,CAMERA_Y);
         tf::Transform tfT;
         tfT.setIdentity();
         mTfBr.sendTransform(tf::StampedTransform(tfT,ros::Time::now(), "/ORB_SLAM/World", "/ORB_SLAM/Camera"));  
@@ -74,8 +72,8 @@ int main(int argc, char **argv)
     
 
     ros::NodeHandle nodeHandler;
-    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/cmd_vel", 1, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1000, &localSlamRunner::GrabImage, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("myRobot/cmd_vel", 1000, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 
@@ -103,6 +101,9 @@ int main(int argc, char **argv)
 
 
     ros::shutdown();
+    pLocalMapper->SetFinish();
+    pDrawer->SetFinish();
+
     th0.join();
     th1.join();
 
@@ -129,13 +130,13 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     mTimeStamp = msg->header.stamp.toSec();
     double deltaTimeStamp = mTimeStamp - preTimeStamp;
-    mOdom[0] = 0 + cos(mTheta)*mYawRate*CAMERA_Y*deltaTimeStamp ;
-    mOdom[1] = mV*deltaTimeStamp + sin(mTheta)*mYawRate*CAMERA_Y*deltaTimeStamp;
-    mOdom[2] = mYawRate*deltaTimeStamp;
+    mOdom[0] = 0;
+    mOdom[1] = mV;
+    mOdom[2] = mYawRate;
 
     // cout<<"====================="<<endl;
-    cout<<"odom:"<<mOdom<<endl;
-    mpTracker->GrabImage(cv_ptr->image, mOdom ,0);
+    //cout<<"odom:"<<mOdom<<endl;
+    mpTracker->GrabImage(cv_ptr->image, mOdom ,deltaTimeStamp);
     preTimeStamp = mTimeStamp;
     cv::Mat Tcw = mpTracker->mCurrentFrame.mTcw;
 

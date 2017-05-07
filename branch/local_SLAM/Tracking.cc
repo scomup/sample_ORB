@@ -34,6 +34,7 @@
 
 #include<mutex>
 
+#define PI 3.14159265258979
 
 using namespace std;
 
@@ -135,13 +136,60 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
 cv::Mat Tracking::GrabImage(const cv::Mat &im, cv::Vec3f odom, const double &timestamp)
 {
     mImGray = im;
+    mDt = timestamp;
 
     if (!mLastFrame.mTcw.empty())
     {
-        cv::Mat Rcw = mLastFrame.mTcw.rowRange(0, 3).colRange(0, 3);
-        cv::Mat v = (cv::Mat_<float>(3, 1) << odom[0], odom[1], 0);
-        v = Rcw * v;
-        printf("odom:dx:%f dy:%f dyaw%f\n", v.at<float>(0), v.at<float>(1), odom[2]);
+        float pitch, roll, yaw;
+        Converter::computeAnglesFromMatrix(mLastFrame.mTcw, pitch, roll, yaw);
+        float v = odom[1];
+        float yawrate = odom[2];
+        float dt = timestamp;
+        cv::Mat dpose;
+        cv::Mat Rold = (cv::Mat_<float>(2, 2) << cos(yaw),-sin(yaw),
+                                                 sin(yaw), cos(yaw));
+
+        cv::Mat campose = (cv::Mat_<float>(2, 1) << -0.05,
+                                                     0.175);
+        if(abs(yawrate) < 0.0001)
+        {
+            dpose = (cv::Mat_<float>(2, 1) << v * dt * sin(yaw),
+                                              v * dt * cos(yaw));
+        }
+
+        else
+        {
+            dpose = (cv::Mat_<float>(2, 1) << (v / yawrate) * (-cos(yawrate * dt + yaw) + cos(yaw)),
+                                              (v / yawrate) * ( sin(yawrate * dt + yaw) - sin(yaw)));
+            yaw = fmod((yaw + yawrate * dt + PI) , (2.0 * PI)) - PI;
+        }
+
+        cv::Mat Rnew = (cv::Mat_<float>(2, 2) << cos(yaw),-sin(yaw),
+                                                 sin(yaw), cos(yaw));
+
+        cv::Mat dcampose = dpose + Rnew *campose - Rold*campose;
+        //cout<<"dpose"<<dpose<<endl;
+        //cout<<"dcampose"<<dcampose<<endl;
+        odom[0] = dcampose.at<float>(0);
+        odom[1] = dcampose.at<float>(1);
+        odom[2] = yawrate*dt;
+        //printf("odom:dx:%f dy:%f dyaw%f\n", odom[0], odom[1], odom[2]);
+
+        cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -odom[2]);
+
+        cv::Mat RcwOld = mTcwOdom.rowRange(0,3).colRange(0,3);
+        cv::Mat Rcw = RcwOld * DRcw;
+        cv::Mat tcw = mTcwOdom.rowRange(0,3).col(3);
+        cv::Mat twc = -RcwOld.t()*tcw;
+        twc.at<float>(0) +=  odom[0];
+        twc.at<float>(1) +=  odom[1];
+        tcw = -Rcw*twc;
+        tcw.copyTo(mTcwOdom.rowRange(0,3).col(3));
+        Rcw.copyTo(mTcwOdom.rowRange(0,3).colRange(0,3));
+
+
+
+
     }
     //float pitch, roll, yaw;
     //Converter::computeAnglesFromMatrix(Rcw, pitch, roll, yaw);
@@ -214,7 +262,6 @@ void Tracking::Track()
             }
             else
             {
-                //bOK = TrackReferenceKeyFrame();
                 bOK = TrackWithMotionModel();
                 if (!bOK)
                 {
@@ -328,7 +375,7 @@ void Tracking::Track()
 
         mLastFrame = Frame(mCurrentFrame);
     }
-    mpDrawer->SetDrawer(mCurrentFrame.mTcw, mlpLocalKeyFrames, mvpLocalMapPoints);
+    mpDrawer->SetDrawer(mCurrentFrame.mTcw,mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints);
 
 }
 
@@ -360,6 +407,7 @@ bool Tracking::TrackWithMotionModel()
         return false;
 
     // Optimize frame pose with all matches
+    printf("check!\n");
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
@@ -431,13 +479,13 @@ void Tracking::Initialization()
             mState = NOT_INITIALIZED;
             return;
         }
-        mDiffPose[2] += mCurrentFrame.mOdom[2];
+        mDiffPose[2] += mCurrentFrame.mOdom[2]*mDt;
 
         cv::Mat Ric = Converter::computeMatrixFromAngles(0, 0, mDiffPose[2]);
-        cv::Mat dtic = Ric*(cv::Mat_<float>(3,1) << mCurrentFrame.mOdom[0], mCurrentFrame.mOdom[1], 0);
+        cv::Mat dtic = Ric*(cv::Mat_<float>(3,1) << mCurrentFrame.mOdom[0]*mDt, mCurrentFrame.mOdom[1]*mDt, 0);
         mDiffPose[0] +=dtic.at<float>(0);
         mDiffPose[1] +=dtic.at<float>(1);
-        cout<<mDiffPose<<endl;
+        //cout<<mDiffPose<<endl;
 
         cv::Mat Rcw2 = Ric.t();
         cv::Mat Rwc2 = Ric;
@@ -561,7 +609,7 @@ void Tracking::Initialization()
                         // Set Frame Poses
             mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
             mCurrentFrame.SetPose(Tcw2);
-
+            mTcwOdom = Tcw2;
             CreateInitialMap();
             cout << "My Initial OK!" << endl;
         }
@@ -699,7 +747,8 @@ bool Tracking::NeedNewKeyFrame()
     int nRefMatches = mpReferenceKF->TrackedMapPoints(1);
 
     const bool c = (mnMatchesInliers<nRefMatches*0.6 );
-    if(c && mCurrentFrame.mOdom[2] < 0.001)
+    if(c)
+    //if(c && abs(mCurrentFrame.mOdom[2]) < 0.001)
     {
         return true;
     }

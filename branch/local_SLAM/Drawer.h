@@ -24,9 +24,14 @@ public:
     void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
     void DrawMapPoints();
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc);
-    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
-    void SetDrawer(cv::Mat& CameraPose, std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints);
+    void DrawCurrentCameraOdom(pangolin::OpenGlMatrix &Twc);
 
+    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
+    void GetCurrentOpenGLCameraMatrixOdom(pangolin::OpenGlMatrix &M);
+
+    void SetDrawer(cv::Mat& CameraPose, cv::Mat& CameraPoseOdom,std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints);
+    void SetFinish();
+    bool isFinished();
 
 private:
     std::list<KeyFrame*> mlpLocalKeyFrames;
@@ -40,6 +45,9 @@ private:
     float mCameraSize;
     float mCameraLineWidth;
     cv::Mat mCameraPose;
+    cv::Mat mCameraPoseOdom;
+    bool mbFinished;
+    std::mutex mMutexFinish;
 
 };
 

@@ -38,6 +38,7 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "codecvt": "cpp",
-        "lu": "cpp"
+        "lu": "cpp",
+        "*.ipp": "cpp"
     }
 }
