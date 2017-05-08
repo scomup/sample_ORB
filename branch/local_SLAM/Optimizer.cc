@@ -152,6 +152,11 @@ double PoseSolver::TotalError()
             n++;
         }
     }
+    if (tot_error_odom / n > 1)
+    {
+        cv::Mat bef = Draw();
+        cv::imshow("bef", bef);
+    }
     printf("proj:%f(avg:%f) odom:%f(avg:%f)\n",tot_error_proj,tot_error_proj/n,tot_error_odom,tot_error_odom/n);
     return tot_error;
 }
@@ -214,7 +219,7 @@ cv::Mat PoseSolver::Draw()
 }
 int PoseSolver::Solve(float maxe)
 {   
-    ////cv::Mat bef = Draw();
+    //cv::Mat bef = Draw();
     //cv::imshow("bef",bef);
     ReadDataFromFrame();
     //Debug info:
@@ -301,7 +306,7 @@ int PoseSolver::Solve(float maxe)
     Update();
     //cv::Mat aft = Draw();
     //cv::imshow("aft",aft);
-    //cv::waitKey(300);
+    cv::waitKey(1);
      //cv::Mat twc = mpFrame->GetCameraCenter();
      //std::cout<<twc<<std::endl;
      return n;
@@ -321,12 +326,19 @@ void PoseSolver::ReadDataFromFrame()
     mYw = twc.at<float>(1);
     //std::cout<<tcw<<std::endl;
     mYawc   = (float)yaw;
-    mDxw    = mpFrame->mOdom[0];
-    mDyw    = mpFrame->mOdom[1];
-    mDyaww  = mpFrame->mOdom[2];
-    mMDxw   = mpFrame->mOdom[0];
-    mMDyw   = mpFrame->mOdom[1];
-    mMDyaww = mpFrame->mOdom[2];
+    //mDxw    = mpFrame->mOdom[0];
+    //mDyw    = mpFrame->mOdom[1];
+    //mDyaww  = mpFrame->mOdom[2];
+    //mMDxw   = mpFrame->mOdom[0];
+    //mMDyw   = mpFrame->mOdom[1];
+    //mMDyaww = mpFrame->mOdom[2];
+    //If motion mode is used, set mDxw/mDyw/mDyaww and mMDxw/mMDyw/mMDyaww to zero
+    mDxw    = 0;
+    mDyw    = 0;
+    mDyaww  = 0;
+    mMDxw   = 0;
+    mMDyw   = 0;
+    mMDyaww = 0;
 }
 }
 

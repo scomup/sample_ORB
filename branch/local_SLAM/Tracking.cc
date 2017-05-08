@@ -256,7 +256,7 @@ void Tracking::Track()
 
         if (mState == OK)
         {
-            if (mVelocity.empty() || mCurrentFrame.mnId < mnLastRelocFrameId + 2)
+            if (mCurrentFrame.mnId < mnLastRelocFrameId + 2)
             {
                 bOK = TrackReferenceKeyFrame();
             }
@@ -332,22 +332,6 @@ void Tracking::Track()
                 
         }
 
-                // If tracking were good, check if we insert a keyframe
-
-        if (mState == OK)
-        {
-            // Update motion model
-            if (!mLastFrame.mTcw.empty())
-            {
-                cv::Mat LastTwc = cv::Mat::eye(4, 4, CV_32F);
-                mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0, 3).colRange(0, 3));
-                mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0, 3).col(3));
-                mVelocity = mCurrentFrame.mTcw * LastTwc;
-
-            }
-            else
-                mVelocity = cv::Mat();
-        }
 
         // We allow points with high innovation (considererd outliers by the Huber Function)
         // pass to the new keyframe, so that bundle adjustment will finally decide
@@ -374,7 +358,7 @@ void Tracking::Track()
 
         mLastFrame = Frame(mCurrentFrame);
     }
-    mpDrawer->SetDrawer(mCurrentFrame.mTcw,mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
+    mpDrawer->SetDrawer(mCurrentFrame.mTcw, mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
 
 }
 
@@ -382,12 +366,19 @@ bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
 
-    //cout<<mVelocity<<endl;
-    //cout<<mLastFrame.mTcw<<endl;
-    //cout<<mVelocity*mLastFrame.mTcw<<endl;
-    //cv::Mat V = mVelocity.clone();
-    //V= V*mLastFrame.mTcw;
-    mCurrentFrame.SetPose(mLastFrame.mTcw);
+    cv::Mat Tcw = mLastFrame.mTcw;
+    cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -mCurrentFrame.mOdom[2]);
+    cv::Mat RcwOld = Tcw.rowRange(0,3).colRange(0,3);
+    cv::Mat Rcw = RcwOld * DRcw;
+    cv::Mat tcw = Tcw.rowRange(0,3).col(3);
+    cv::Mat twc = -RcwOld.t()*tcw;
+    twc.at<float>(0) +=  mCurrentFrame.mOdom[0];
+    twc.at<float>(1) +=  mCurrentFrame.mOdom[1];
+    tcw = -Rcw*twc;
+    tcw.copyTo(Tcw.rowRange(0,3).col(3));
+    Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
+
+    mCurrentFrame.SetPose(Tcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 

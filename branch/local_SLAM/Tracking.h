@@ -159,9 +159,6 @@ protected:
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
-    //Motion Model
-    cv::Mat mVelocity;
-
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;
 
