@@ -23,7 +23,7 @@ public:
     void Run();
     void SetFinish();
     bool isFinished();
-    void SetDrawer(cv::Mat& CameraPose, cv::Mat& CameraPoseOdom,std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints);
+    void SetDrawer(cv::Mat& CameraPose, cv::Mat& CameraPoseOdom,std::list<KeyFrame*> lpLocalKeyFrames, std::vector<MapPoint*> vpLocalMapPoints, long unsigned int nCurId);
 
 
 protected:
@@ -48,6 +48,7 @@ private:
     cv::Mat mCameraPoseOdom;
     bool mbFinished;
     std::mutex mMutexFinish;
+    long unsigned int mnCurId;
 
 };
 

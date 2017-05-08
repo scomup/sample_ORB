@@ -374,7 +374,7 @@ void Tracking::Track()
 
         mLastFrame = Frame(mCurrentFrame);
     }
-    mpDrawer->SetDrawer(mCurrentFrame.mTcw,mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints);
+    mpDrawer->SetDrawer(mCurrentFrame.mTcw,mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
 
 }
 
