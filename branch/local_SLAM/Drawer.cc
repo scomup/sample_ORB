@@ -4,8 +4,10 @@
 #include <mutex>
 #include <limits>
 
+
 namespace sample_ORB
 {
+    
 
 Drawer::Drawer():
 mKeyFrameSize(0.1),
@@ -58,7 +60,7 @@ void Drawer::Run()
         DrawMapPoints();
         DrawCurrentCamera(Twc, color1);
         DrawCurrentCamera(TwcOdom, color2);
-
+        DrawPath();
         pangolin::FinishFrame();
 
         lk.unlock();
@@ -81,6 +83,19 @@ bool Drawer::isFinished()
 {
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
+}
+
+void Drawer::DrawPath()
+{
+    glLineWidth(3);
+    glColor3f(0,1,0);
+    glBegin(GL_LINE_STRIP);
+    for (size_t i = 0, iend = mvpPathPoints.size(); i < iend; i++)
+    {
+        cv::Vec3f point = mvpPathPoints[i];
+        glVertex3f(point[0],point[1],point[2]);
+    }
+    glEnd();
 }
 
 void Drawer::DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, cv::Scalar color)
@@ -234,7 +249,7 @@ void Drawer::DrawMapPoints()
         if(vpMPs[i]->mnLastFrameSeen != mnCurId)
             glColor3f(1.0,0.0,0.0);
         else
-            glColor3f(1.0,1.0,0.0);
+            glColor3f(0.0,1.0,0.0);
         cv::Mat pos = vpMPs[i]->GetWorldPos();
         glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
     }
@@ -246,6 +261,14 @@ void Drawer::SetDrawer(cv::Mat& CameraPose, cv::Mat& CameraPoseOdom,std::list<Ke
     mvpLocalMapPoints = vpLocalMapPoints;
     mlpLocalKeyFrames = lpLocalKeyFrames;
     mnCurId = nCurId;
+    cv::Vec3f point;
+    cv::Mat Rcw = CameraPose.rowRange(0,3).colRange(0,3);
+    cv::Mat tcw = CameraPose.rowRange(0,3).col(3);
+    cv::Mat twc = -Rcw.t()*tcw;
+    point[0] = twc.at<float>(0);
+    point[1] = twc.at<float>(1);
+    point[2] = twc.at<float>(2);
+    mvpPathPoints.push_back(point);
 
 }
 

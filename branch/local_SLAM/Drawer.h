@@ -30,12 +30,15 @@ protected:
 
     void DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph);
     void DrawMapPoints();
+    void DrawPath();
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, cv::Scalar color);
     void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, cv::Mat CameraPose);
 
 private:
     std::list<KeyFrame*> mlpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
+    std::vector<cv::Vec3f> mvpPathPoints;
+
     std::mutex mTx_;
     std::mutex mMutexCamera;
     float mKeyFrameSize;

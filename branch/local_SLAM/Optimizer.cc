@@ -18,6 +18,10 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+
+#define USE_POSESOLVER
+
+
 #include "Optimizer.h"
 
 #include "../../Thirdparty/g2o/g2o/core/block_solver.h"
@@ -83,8 +87,8 @@ class PoseSolver
 
 PoseSolver::PoseSolver(Frame *pFrame) : mpFrame(pFrame)
 {
-    mKV = 100;
-    mKYaw = 50;
+    mKV = 300;
+    mKYaw = 150;
 }
 
 Eigen::Matrix<double, 5, 3> PoseSolver::Jacobiani(cv::Mat point)
@@ -157,7 +161,7 @@ double PoseSolver::TotalError()
         cv::Mat bef = Draw();
         cv::imshow("bef", bef);
     }
-    printf("proj:%f(avg:%f) odom:%f(avg:%f)\n",tot_error_proj,tot_error_proj/n,tot_error_odom,tot_error_odom/n);
+    debug_printf("proj:%f(avg:%f) odom:%f(avg:%f)\n",tot_error_proj,tot_error_proj/n,tot_error_odom,tot_error_odom/n);
     return tot_error;
 }
 
@@ -179,7 +183,7 @@ void PoseSolver::Update()
     mMDyw = mpFrame->mOdom[1] = mMDyw    - mDyw;
     mMDyaww = mpFrame->mOdom[2] = mMDyaww  - mDyaww;
 
-    printf("opt:dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
+    debug_printf("opt:dx:%f dy:%f dyaw%f\n",mDxw,mDyw,mDyaww);
 
 
 }
@@ -345,7 +349,7 @@ void PoseSolver::ReadDataFromFrame()
 namespace sample_ORB
 {
 using namespace std;
-#if 1
+#ifdef USE_POSESOLVER
 
 int Optimizer::PoseOptimization(Frame *pFrame)
 {

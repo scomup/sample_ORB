@@ -18,6 +18,14 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+//#define DEBUG
+
+#ifdef DEBUG
+#define debug_printf(fmt, ...) printf(fmt, __VA_ARGS__)
+#else
+#define debug_printf(...)
+#endif
+
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 

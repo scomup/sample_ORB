@@ -29,7 +29,7 @@
 #include"Drawer.h"
 #include"Optimizer.h"
 #include "Converter.h"
-
+#include "ros/ros.h"
 #include<iostream>
 
 #include<mutex>
@@ -265,7 +265,7 @@ void Tracking::Track()
                 bOK = TrackWithMotionModel();
                 if (!bOK)
                 {
-                    printf("TrackReferenceKeyFrame!\n");
+                    ROS_WARN("TrackWithMotionModel failed!\n");
                     bOK = TrackReferenceKeyFrame();
                 }
             }
@@ -273,7 +273,7 @@ void Tracking::Track()
         
         else
         {
-            printf("TODO: pose error!\n");
+            ROS_ERROR("TODO: pose error!\n");
         }
 
         mCurrentFrame.mpReferenceKF = mpReferenceKF;
@@ -281,13 +281,13 @@ void Tracking::Track()
         if(mState == OK)
             bOK = TrackLocalMap();
         else
-            printf("TODO: Cannot tracking!\n");
+            ROS_ERROR("TODO: Cannot tracking!\n");
 
 
         if(mState != OK)
         {
             mState = LOST;
-            printf("TrackLocalMap Error!\n");
+            ROS_ERROR("TrackLocalMap Error!\n");
         }
 
         if(mState == OK)
@@ -397,12 +397,12 @@ bool Tracking::TrackWithMotionModel()
         return false;
 
     // Optimize frame pose with all matches
-    printf("check!\n");
+    //printf("check!\n");
     nmatches = Optimizer::PoseOptimization(&mCurrentFrame);
 
     if(nmatches<50)
     {
-        cout<<"Pose Optimization get too little inlier.\n"<<endl;
+        ROS_WARN("PoseOptimization get too little inlier(%d).\n",nmatches);
         return false;
     }
     // Discard outliers
@@ -606,7 +606,6 @@ void Tracking::Initialization()
             mCurrentFrame.SetPose(Tcw2);
             mTcwOdom = Tcw2;
             CreateInitialMap();
-            cout << "My Initial OK!" << endl;
         }
     }
 }
@@ -646,7 +645,7 @@ void Tracking::CreateInitialMap()
     // Update Connections
     pKFcur->ChangeParent(pKFini);
 
-    cout << "New Map created ! " << endl;
+    cout << "New Map created!(use new initialization function) " << endl;
 
     if(pKFcur->TrackedMapPoints(1)<100)
     {
@@ -702,8 +701,8 @@ bool Tracking::TrackReferenceKeyFrame()
     int nmatches = matcher.SearchNearby(mpReferenceKF, mCurrentFrame);
     //int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
     int nhave = mpReferenceKF->TrackedMapPoints(1);
-    printf("have %d points in TrackReferenceKeyFrame\n",nhave);
-    printf("nmatches %d in TrackReferenceKeyFrame\n",nmatches);
+    debug_printf("have %d points in TrackReferenceKeyFrame\n",nhave);
+    debug_printf("nmatches %d in TrackReferenceKeyFrame\n",nmatches);
 
     if(nmatches<50)
         return false;
@@ -742,8 +741,8 @@ bool Tracking::NeedNewKeyFrame()
     int nRefMatches = mpReferenceKF->TrackedMapPoints(1);
 
     const bool c = (mnMatchesInliers<nRefMatches*0.6 );
-    if(c)
-    //if(c && abs(mCurrentFrame.mOdom[2]) < 0.001)
+    //if(c)
+    if(c && abs(mCurrentFrame.mOdom[2]) < 0.001)
     {
         return true;
     }

@@ -38,6 +38,7 @@ void LocalMapping::Run()
 
 
     // Check if there are keyframes in the queue
+
     while (true)
     {
         if (CheckNewKeyFrames())
@@ -49,12 +50,12 @@ void LocalMapping::Run()
             //auto msec = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();
             //std::cout << msec << " milli sec \n";
             
-            auto start1 = std::chrono::system_clock::now(); 
+            //auto start1 = std::chrono::system_clock::now(); 
             CreateNewMapPoints();
-            auto end1 = std::chrono::system_clock::now();  
-            auto dur1 = end1 - start1;        // 要した時間を計算
-            auto msec1 = std::chrono::duration_cast<std::chrono::milliseconds>(dur1).count();
-            std::cout << msec1 << " milli sec \n";
+            //auto end1 = std::chrono::system_clock::now();  
+            //auto dur1 = end1 - start1;        // 要した時間を計算
+            //auto msec1 = std::chrono::duration_cast<std::chrono::milliseconds>(dur1).count();
+            //std::cout << msec1 << " milli sec \n";
  
             bool mbAbortBA = 0;
             if(!CheckNewKeyFrames())
