@@ -47,7 +47,7 @@ public:
               const std::string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    cv::Mat GrabImage(const cv::Mat &im, cv::Vec3f mOdom ,const double &timestamp);
+    cv::Mat GrabImage(const cv::Mat &im, cv::Vec3f cmd ,const double &timestamp, const double &dt);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
 
@@ -172,6 +172,10 @@ protected:
     float mDt;
 
     cv::Mat mTcwOdom;
+
+    cv::Mat mCampose;
+
+    bool mbTryInit;
 };
 
 } //namespace ORB_SLAM

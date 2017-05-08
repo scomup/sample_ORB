@@ -31,7 +31,6 @@ public:
 
     localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
         
-        //mTheta = atan2(CAMERA_X,CAMERA_Y);
         tf::Transform tfT;
         tfT.setIdentity();
         mTfBr.sendTransform(tf::StampedTransform(tfT,ros::Time::now(), "/ORB_SLAM/World", "/ORB_SLAM/Camera"));  
@@ -45,7 +44,7 @@ public:
     Tracking*       mpTracker;
     bool            mbFirstImg;
     
-    cv::Vec3f    mOdom; 
+    cv::Vec3f    mCmd; 
     double  mTimeStamp;
     double  mV;
     double  mYawRate;
@@ -56,7 +55,7 @@ public:
 int main(int argc, char **argv)
 {
 
-    ros::init(argc, argv, "Mono");
+    ros::init(argc, argv, "local_SLAM");
     ros::start();
 
 
@@ -130,13 +129,12 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     mTimeStamp = msg->header.stamp.toSec();
     double deltaTimeStamp = mTimeStamp - preTimeStamp;
-    mOdom[0] = 0;
-    mOdom[1] = mV;
-    mOdom[2] = mYawRate;
+    mCmd[0] = 0;
+    mCmd[1] = mV;
+    mCmd[2] = mYawRate;
 
-    // cout<<"====================="<<endl;
-    //cout<<"odom:"<<mOdom<<endl;
-    mpTracker->GrabImage(cv_ptr->image, mOdom ,deltaTimeStamp);
+    //cout<<"mCmd:"<<mCmd<<endl;
+    mpTracker->GrabImage(cv_ptr->image, mCmd, mTimeStamp, deltaTimeStamp);
     preTimeStamp = mTimeStamp;
     cv::Mat Tcw = mpTracker->mCurrentFrame.mTcw;
 
