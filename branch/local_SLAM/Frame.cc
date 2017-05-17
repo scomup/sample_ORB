@@ -41,7 +41,7 @@ Frame::Frame(const Frame &frame)
     :mpORBextractor(frame.mpORBextractor),
      mTimeStamp(frame.mTimeStamp),
      mOdom(frame.mOdom),
-     mCmd(frame.mCmd),
+     //mCmd(frame.mCmd),
      mK(frame.mK.clone()), 
      mDistCoef(frame.mDistCoef.clone()),
      N(frame.N),
@@ -68,11 +68,11 @@ Frame::Frame(const Frame &frame)
         SetPose(frame.mTcw);
 }
 
-Frame::Frame(const cv::Mat &imGray,const cv::Vec3f cmd, cv::Vec3f odom, const double &timeStamp, ORBextractor* extractor, cv::Mat &K, cv::Mat &distCoef)
+Frame::Frame(const cv::Mat &imGray, cv::Vec3f odom, const double &timeStamp, ORBextractor* extractor, cv::Mat &K, cv::Mat &distCoef)
     :mpORBextractor(extractor),
      mTimeStamp(timeStamp), 
      mOdom(odom),
-     mCmd(cmd),
+     //mCmd(cmd),
      mK(K.clone()),
      mDistCoef(distCoef.clone())
 {

@@ -114,10 +114,18 @@ void LocalMapping::ProcessNewKeyFrame()
     
 
     KeyFrame* pKF = mpCurrentKeyFrame;
-    while(mlpLocalKeyFrames.size()<5 && pKF->mnId != 0){
-        pKF = pKF->GetParent();
-        mlpLocalKeyFrames.push_back(pKF);
+    while (mlpLocalKeyFrames.size() < 5 && pKF->mnId != 0)
+    {
+        if (pKF->GetParent() != nullptr)
+        {
+            pKF = pKF->GetParent();
+            mlpLocalKeyFrames.push_back(pKF);
+        }
+        else
+            break;
     }
+    //printf("mlpLocalKeyFrames size: %d\n", mlpLocalKeyFrames.size());
+
 
     // Associate MapPoints to the new keyframe and update normal and descriptor
     const vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();

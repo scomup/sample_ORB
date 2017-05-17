@@ -17,6 +17,7 @@
 #include "LocalMapping.h"
 #include "Tracking.h"
 #include <tf/transform_broadcaster.h>
+#include<mutex>
 
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
@@ -29,7 +30,7 @@ class localSlamRunner
 
 public:
 
-    localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0){
+    localSlamRunner(Tracking*  track):mpTracker(track),mbFirstImg(true),mTimeStamp(0),mV(0),mYawRate(0),mInitOdom(false){
         
         tf::Transform tfT;
         tfT.setIdentity();
@@ -37,19 +38,22 @@ public:
     }
 
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
-    //void GrabOdom(const nav_msgs::Odometry::ConstPtr &msg);
-    void GrabOdom(const geometry_msgs::Twist& vel_cmd);
+    void GrabOdom(const nav_msgs::Odometry::ConstPtr &msg);
+    //void GrabOdom(const geometry_msgs::Twist& vel_cmd);
 
 
     Tracking*       mpTracker;
     bool            mbFirstImg;
-    
     cv::Vec3f    mCmd; 
     double  mTimeStamp;
     double  mV;
     double  mYawRate;
     double  mTheta;
     tf::TransformBroadcaster mTfBr;
+    tf::Transform mOdometryTransform;
+    bool            mInitOdom;   
+    std::mutex mMutexOdom;
+
 };
 
 int main(int argc, char **argv)
@@ -71,8 +75,8 @@ int main(int argc, char **argv)
     
 
     ros::NodeHandle nodeHandler;
-    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1000, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("myRobot/cmd_vel", 1000, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("/Rulo/odom", 1, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 
@@ -112,7 +116,12 @@ int main(int argc, char **argv)
 void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 {
     // Copy the ros image message to cv::Mat.
-    static double    preTimeStamp;  
+    static double    preTimeStamp;
+    mMutexOdom.lock();
+    tf::Transform odom = mOdometryTransform;
+    mMutexOdom.unlock();
+    if(!mInitOdom)
+        return;
     if(mbFirstImg == true){
         preTimeStamp = msg->header.stamp.toSec();
     }
@@ -129,12 +138,8 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
     }
     mTimeStamp = msg->header.stamp.toSec();
     double deltaTimeStamp = mTimeStamp - preTimeStamp;
-    mCmd[0] = 0;
-    mCmd[1] = mV;
-    mCmd[2] = mYawRate;
 
-    //cout<<"mCmd:"<<mCmd<<endl;
-    mpTracker->GrabImage(cv_ptr->image, mCmd, mTimeStamp, deltaTimeStamp);
+    mpTracker->GrabImage(cv_ptr->image, odom, mTimeStamp, deltaTimeStamp);
     preTimeStamp = mTimeStamp;
     cv::Mat Tcw = mpTracker->mCurrentFrame.mTcw;
 
@@ -150,25 +155,32 @@ void localSlamRunner::GrabImage(const sensor_msgs::ImageConstPtr& msg)
         mTfBr.sendTransform(tf::StampedTransform(tfTcw, ros::Time::now(), "ORB_SLAM/World", "ORB_SLAM/Camera"));
     }
 }
-/*
-void localSlamRunner::GrabOdom(const nav_msgs::Odometry::ConstPtr &msg)
-{
-    if(mbFirstImg)
-        return;
-    double roll, pitch, yaw;
-    tf::Quaternion q(msg->pose.pose.orientation.x,
-        msg->pose.pose.orientation.y,
-        msg->pose.pose.orientation.z,
-        msg->pose.pose.orientation.w);
-    tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
-    mOdom[0] = -msg->pose.pose.position.y;
-    mOdom[1] = msg->pose.pose.position.x;
-    mOdom[2] = yaw;
-}*/
 
+void localSlamRunner::GrabOdom(const nav_msgs::Odometry::ConstPtr &odom)
+{
+   if(!mInitOdom)
+    mInitOdom = true;
+    std::unique_lock<std::mutex> lock2(mMutexOdom);
+   //     return;
+  mOdometryTransform.setOrigin(tf::Vector3(odom->pose.pose.position.x,
+                          odom->pose.pose.position.y,
+                          odom->pose.pose.position.z
+                          )
+              );
+              
+  mOdometryTransform.setRotation(tf::Quaternion(odom->pose.pose.orientation.x,
+                               odom->pose.pose.orientation.y,
+                               odom->pose.pose.orientation.z,
+                               odom->pose.pose.orientation.w                               
+                               )
+                );
+}
+
+/*
 void localSlamRunner::GrabOdom(const geometry_msgs::Twist& vel_cmd)
 {
     mV = vel_cmd.linear.x;
     mYawRate = vel_cmd.angular.z;
 
 }
+*/

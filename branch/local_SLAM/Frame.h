@@ -44,7 +44,7 @@ public:
     Frame(const Frame &frame);
 
     // Constructor for Monocular cameras.
-    Frame(const cv::Mat &imGray, cv::Vec3f cmd, const cv::Vec3f odom, const double &timeStamp, ORBextractor* extractor, cv::Mat &K, cv::Mat &distCoef);
+    Frame(const cv::Mat &imGray, const cv::Vec3f odom, const double &timeStamp, ORBextractor* extractor, cv::Mat &K, cv::Mat &distCoef);
     // Extract ORB on the image.
     void ExtractORB(const cv::Mat &im);
 
@@ -84,7 +84,7 @@ public:
 
     //odom info
     cv::Vec3f mOdom;
-    cv::Vec3f mCmd;
+    //cv::Vec3f mCmd;
     // Calibration matrix and OpenCV distortion parameters.
     cv::Mat mK;
     static float fx;

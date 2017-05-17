@@ -29,6 +29,7 @@
 #include "LocalMapping.h"
 #include "Frame.h"
 #include "ORBextractor.h"
+#include <tf/transform_broadcaster.h>
 
 #include <mutex>
 
@@ -47,7 +48,7 @@ public:
               const std::string &strSettingPath);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    cv::Mat GrabImage(const cv::Mat &im, cv::Vec3f cmd ,const double &timestamp, const double &dt);
+    cv::Mat GrabImage(const cv::Mat &im, tf::Transform odometryTransform ,const double &timestamp, const double &dt);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
 
@@ -66,8 +67,9 @@ public:
         SYSTEM_NOT_READY=-1,
         NO_IMAGES_YET=0,
         NOT_INITIALIZED=1,
-        OK=2,
-        LOST=3
+        TRY_INITIALIZE=2,
+        OK=3,
+        LOST=4
     };
 
     eTrackingState mState;
@@ -173,6 +175,10 @@ protected:
     cv::Mat mCampose;
 
     bool mbTryInit;
+
+    tf::Transform mCurrOdometryTransform;
+    tf::Transform mLastOdometryTransform;
+
 };
 
 } //namespace ORB_SLAM
