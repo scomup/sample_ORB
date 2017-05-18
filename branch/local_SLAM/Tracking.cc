@@ -136,7 +136,20 @@ void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
     mpLocalMapper=pLocalMapper;
 }
 
+void Tracking::PoseUpdateByOdom(cv::Mat &Tcw, const cv::Vec3f odom)
+{
+    cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -odom[2]);
 
+    cv::Mat RcwOld = Tcw.rowRange(0, 3).colRange(0, 3);
+    cv::Mat Rcw = RcwOld * DRcw;
+    cv::Mat tcw = Tcw.rowRange(0, 3).col(3);
+    cv::Mat twc = -RcwOld.t() * tcw;
+    twc.at<float>(0) += odom[0];
+    twc.at<float>(1) += odom[1];
+    tcw = -Rcw * twc;
+    tcw.copyTo(Tcw.rowRange(0, 3).col(3));
+    Rcw.copyTo(Tcw.rowRange(0, 3).colRange(0, 3));
+}
 
 cv::Mat Tracking::GrabImage(const cv::Mat &im, tf::Transform odometryTransform, const double &timestamp, const double &dt)
 {
@@ -159,8 +172,9 @@ cv::Mat Tracking::GrabImage(const cv::Mat &im, tf::Transform odometryTransform, 
         float dx = mCurrOdometryTransform.getOrigin().getX() - mLastOdometryTransform.getOrigin().getX();
         float dy = mCurrOdometryTransform.getOrigin().getY() - mLastOdometryTransform.getOrigin().getY();
        
-        cv::Mat dpose;    
-        dpose = (cv::Mat_<float>(2, 1) << -dy, dx);
+        cv::Mat dpose;   
+        dpose = (cv::Mat_<float>(2, 1) << -dy, dx); //gazebo
+        //dpose = (cv::Mat_<float>(2, 1) << dx, dy); //kobuki
 
         cv::Mat Rold = (cv::Mat_<float>(2, 2) << cos(yaw),-sin(yaw),
                                                  sin(yaw), cos(yaw)); 
@@ -174,17 +188,7 @@ cv::Mat Tracking::GrabImage(const cv::Mat &im, tf::Transform odometryTransform, 
         odom[1] = dcampose.at<float>(1);
         odom[2] = dyaw;
 
-        cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -odom[2]);
-
-        cv::Mat RcwOld = mTcwOdom.rowRange(0,3).colRange(0,3);
-        cv::Mat Rcw = RcwOld * DRcw;
-        cv::Mat tcw = mTcwOdom.rowRange(0,3).col(3);
-        cv::Mat twc = -RcwOld.t()*tcw;
-        twc.at<float>(0) +=  odom[0];
-        twc.at<float>(1) +=  odom[1];
-        tcw = -Rcw*twc;
-        tcw.copyTo(mTcwOdom.rowRange(0,3).col(3));
-        Rcw.copyTo(mTcwOdom.rowRange(0,3).colRange(0,3));
+        PoseUpdateByOdom(mTcwOdom, odom);
 
 
     }
@@ -246,13 +250,8 @@ cv::Mat Tracking::GrabImage(const cv::Mat &im, tf::Transform odometryTransform, 
     cv::imshow("FRAME", sim);
     cv::waitKey(1);
 
-    if (!mCurrentFrame.mTcw.empty() && !mTcwOdom.empty())
-        mpDrawer->SetDrawer(mCurrentFrame.mTcw, mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
-    else if (!mTcwOdom.empty() && !mInitialFrame.mTcw.empty())
-    {
-        cv::Mat Tcw = cv::Mat::eye(4, 4, CV_32F);
-        mpDrawer->SetDrawer(Tcw, mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
-    }
+    mpDrawer->SetDrawer(mCurrentFrame.mTcw, mTcwOdom, mlpLocalKeyFrames, mvpLocalMapPoints, mCurrentFrame.mnId);
+
     return mCurrentFrame.mTcw.clone();
 }
 
@@ -391,16 +390,7 @@ bool Tracking::TrackWithMotionModel()
 
     cv::Mat Tcw = mLastFrame.mTcw;
     
-    cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -mCurrentFrame.mOdom[2]);
-    cv::Mat RcwOld = Tcw.rowRange(0,3).colRange(0,3);
-    cv::Mat Rcw = RcwOld * DRcw;
-    cv::Mat tcw = Tcw.rowRange(0,3).col(3);
-    cv::Mat twc = -RcwOld.t()*tcw;
-    twc.at<float>(0) +=  mCurrentFrame.mOdom[0];
-    twc.at<float>(1) +=  mCurrentFrame.mOdom[1];
-    tcw = -Rcw*twc;
-    tcw.copyTo(Tcw.rowRange(0,3).col(3));
-    Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
+    PoseUpdateByOdom(Tcw, mCurrentFrame.mOdom);
     
     mCurrentFrame.SetPose(Tcw);
 
@@ -460,6 +450,7 @@ void Tracking::Initialization()
         // Set Reference Frame
         if (mCurrentFrame.mvKeys.size() > 100)
         {
+            mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
@@ -467,8 +458,8 @@ void Tracking::Initialization()
                 mvbPrevMatched[i] = mCurrentFrame.mvKeysUn[i].pt;
 
 
-            mLastFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
             mTcwOdom = cv::Mat::eye(4,4,CV_32F);
+            mTcwInit = cv::Mat::eye(4,4,CV_32F);
             printf("set initialPose!\n");
             fill(mvIniMatches.begin(), mvIniMatches.end(), -1);
             mState = TRY_INITIALIZE;
@@ -487,161 +478,147 @@ void Tracking::Initialization()
 
         // Find correspondences
         ORBmatcher matcher(0.7, true);
-        int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
-
+        //cv::Mat newTcw = mLastFrame.mTcw.clone();
+        PoseUpdateByOdom(mTcwInit, mCurrentFrame.mOdom);
+        mCurrentFrame.SetPose(mTcwInit);
+        //cout<<"i:"<<mInitialFrame.mTcw<<endl;
+        //cout<<"c:"<<mCurrentFrame.mTcw<<endl;
+        int nmatches = matcher.SearchForInitializationByProjection(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches);
+        //int nmatches = matcher.SearchForInitialization(mInitialFrame, mCurrentFrame, mvbPrevMatched, mvIniMatches, 100);
+        printf("%d\n",nmatches);
         // Check if there are enough correspondences
         if (nmatches < 50)
-        {  
-            printf("init 1 error\n");
-            mState = NOT_INITIALIZED;
+        {
+            printf("Initialization maching:%d\n", nmatches);
+            cv::Mat tcw = mTcwInit.rowRange(0, 3).colRange(0, 3);
+            double base_line = cv::norm(tcw);
+            if (base_line > 1.3)
+                mState = NOT_INITIALIZED;
             return;
         }
-        //mDiffPose[2] += mCurrentFrame.mCmd[2]*mDt;
-
-/*
-        cv::Mat Ric = Converter::computeMatrixFromAngles(0, 0, mDiffPose[2]);
-        cv::Mat dtic = Ric*(cv::Mat_<float>(3,1) << mCurrentFrame.mCmd[0]*mDt, mCurrentFrame.mCmd[1]*mDt, 0);
-        mDiffPose[0] +=dtic.at<float>(0);
-        mDiffPose[1] +=dtic.at<float>(1);
-        //cout<<mDiffPose<<endl;
-
-        cv::Mat Rcw2 = Ric.t();
-        cv::Mat Rwc2 = Ric;
-        cv::Mat tcw2 = -Rcw2*(cv::Mat_<float>(3,1) << mDiffPose[0], mDiffPose[1], 0);
-
-        cv::Mat Tcw2 = cv::Mat::eye(4,4,CV_32F);
-        Rcw2.copyTo(Tcw2.rowRange(0,3).colRange(0, 3));
-        tcw2.copyTo(Tcw2.rowRange(0, 3).col(3));
-
-        cv::Mat Rcw1 = cv::Mat::eye(3, 3, CV_32F);
-        cv::Mat Rwc1 = cv::Mat::eye(3, 3, CV_32F);
-        cv::Mat tcw1 = cv::Mat::zeros(3, 1, CV_32F);
-        cv::Mat Tcw1 = cv::Mat::eye(4, 4, CV_32F);
-        */
 
 
-        cv::Mat Tcw2 = mTcwOdom;
-        cv::Mat Rcw2 = Tcw2.rowRange(0,3).colRange(0, 3);
-        cv::Mat tcw2 = Tcw2.rowRange(0, 3).col(3);
-        cv::Mat Rwc2 = Rcw2.t();;
 
-        cv::Mat Rcw1 = cv::Mat::eye(3, 3, CV_32F);
-        cv::Mat Rwc1 = cv::Mat::eye(3, 3, CV_32F);
-        cv::Mat tcw1 = cv::Mat::zeros(3, 1, CV_32F);
-        cv::Mat Tcw1 = cv::Mat::eye(4, 4, CV_32F);      
+    cv::Mat Tcw2 = mTcwInit;
+    cv::Mat Rcw2 = Tcw2.rowRange(0, 3).colRange(0, 3);
+    cv::Mat tcw2 = Tcw2.rowRange(0, 3).col(3);
+    cv::Mat Rwc2 = Rcw2.t();
+    ;
 
-        const float fx2 = mCurrentFrame.fx;
-        const float fy2 = mCurrentFrame.fy;
-        const float cx2 = mCurrentFrame.cx;
-        const float cy2 = mCurrentFrame.cy;
-        const float invfx2 = 1.0f / fx2;
-        const float invfy2 = 1.0f / fy2;
+    cv::Mat Rcw1 = cv::Mat::eye(3, 3, CV_32F);
+    cv::Mat Rwc1 = cv::Mat::eye(3, 3, CV_32F);
+    cv::Mat tcw1 = cv::Mat::zeros(3, 1, CV_32F);
+    cv::Mat Tcw1 = cv::Mat::eye(4, 4, CV_32F);
 
-        const float fx1 = mInitialFrame.fx;
-        const float fy1 = mInitialFrame.fy;
-        const float cx1 = mInitialFrame.cx;
-        const float cy1 = mInitialFrame.cy;
-        const float invfx1 = 1.0f / fx1;
-        const float invfy1 = 1.0f / fy1;
+    const float fx2 = mCurrentFrame.fx;
+    const float fy2 = mCurrentFrame.fy;
+    const float cx2 = mCurrentFrame.cx;
+    const float cy2 = mCurrentFrame.cy;
+    const float invfx2 = 1.0f / fx2;
+    const float invfy2 = 1.0f / fy2;
 
-        // Triangulate each match
-        //mInitialFrame,mCurrentFrame
-        //   SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
-        double base_line = cv::norm(tcw2);
-        cout<<"mTcwOdom:"<<endl<<base_line<<endl;
-        //printf("%f\n",base_line);
-        //printf("tfi->x:%5.3f y:%5.3f z:%5.3f yaw:%5.3f\n",-transpose.y(), transpose.x(), transpose.z(), mCurrentFrame.mYaw);
-        if (base_line > 1.2)
+    const float fx1 = mInitialFrame.fx;
+    const float fy1 = mInitialFrame.fy;
+    const float cx1 = mInitialFrame.cx;
+    const float cy1 = mInitialFrame.cy;
+    const float invfx1 = 1.0f / fx1;
+    const float invfy1 = 1.0f / fy1;
+
+    // Triangulate each match
+    //mInitialFrame,mCurrentFrame
+    //   SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
+    double base_line = cv::norm(tcw2);
+    //printf("%f\n",base_line);
+    //printf("tfi->x:%5.3f y:%5.3f z:%5.3f yaw:%5.3f\n",-transpose.y(), transpose.x(), transpose.z(), mCurrentFrame.mYaw);
+    if (base_line > 0.2)
+    {
+        mvIniP3D.resize(mvIniMatches.size());
+        for (size_t ikp = 0, iendkp = mvIniMatches.size(); ikp < iendkp; ikp++)
         {
-            mvIniP3D.resize(mvIniMatches.size());
-            for (size_t ikp = 0, iendkp = mvIniMatches.size(); ikp < iendkp; ikp++)
+            if (mvIniMatches[ikp] == -1)
+                continue;
+
+            const cv::KeyPoint &kp1 = mInitialFrame.mvKeysUn[ikp];
+            const cv::KeyPoint &kp2 = mCurrentFrame.mvKeysUn[mvIniMatches[ikp]];
+            float diff = (kp1.pt.x - kp2.pt.x) * (kp1.pt.x - kp2.pt.x) + (kp1.pt.y - kp2.pt.y) * (kp1.pt.y - kp2.pt.y);
+            if (diff < 16)
             {
-                if (mvIniMatches[ikp] == -1)
-                    continue;
-
-                const cv::KeyPoint &kp1 = mInitialFrame.mvKeysUn[ikp];
-                const cv::KeyPoint &kp2 = mCurrentFrame.mvKeysUn[mvIniMatches[ikp]];
-                float diff = (kp1.pt.x - kp2.pt.x)*(kp1.pt.x - kp2.pt.x) + (kp1.pt.y - kp2.pt.y)*(kp1.pt.y - kp2.pt.y);
-                if(diff < 16)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-                //cv::line(mInitialFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
-                //cv::line(mCurrentFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
-                //cv::circle(mInitialFrame.im, kp1.pt, 2, cv::Scalar(0, 255, 0));
-                //cv::circle(mCurrentFrame.im, kp2.pt, 2, cv::Scalar(0, 255, 0));
-
-                // Check parallax between rays
-                cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1) * invfx1, (kp1.pt.y - cy1) * invfy1, 1.0);
-                cv::Mat ray1 = Rwc1 * xn1;
-                cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2) * invfx2, (kp2.pt.y - cy2) * invfy2, 1.0);
-                cv::Mat ray2 = Rwc2 * xn2;
-                const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
-
-                if (cosParallaxRays < 0 || cosParallaxRays > 0.9998)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-                // Linear Triangulation Method
-                cv::Mat A(4, 4, CV_32F);
-                A.row(0) = xn1.at<float>(0) * Tcw1.row(2) - Tcw1.row(0);
-                A.row(1) = xn1.at<float>(1) * Tcw1.row(2) - Tcw1.row(1);
-                A.row(2) = xn2.at<float>(0) * Tcw2.row(2) - Tcw2.row(0);
-                A.row(3) = xn2.at<float>(1) * Tcw2.row(2) - Tcw2.row(1);
-
-                cv::Mat w, u, vt;
-                cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
-
-                cv::Mat x3D = vt.row(3).t();
-
-                if (x3D.at<float>(3) == 0)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-                // Euclidean coordinates
-                x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
-                cv::Mat x3Dt = x3D.t();
-
-                //Check triangulation in front of cameras
-                float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
-                if (z1 <= 0)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-                float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
-                if (z2 <= 0)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-
-                if (x3Dt.at<float>(2) < 1 && x3Dt.at<float>(2) > 20)
-                {
-                    mvIniMatches[ikp]=-1;
-                    continue;
-                }
-
-                //cout<<ikp<<":"<<x3Dt<<endl;
-                mvIniP3D[ikp] = cv::Point3f(x3Dt.at<float>(0), x3Dt.at<float>(1), x3Dt.at<float>(2));
-                //printf("init point %5.3f %5.3f %5.3f\n",x3Dt.at<float>(0),x3Dt.at<float>(1),x3Dt.at<float>(2));
+                mvIniMatches[ikp] = -1;
+                continue;
             }
-            //cv::imwrite("left.png",mInitialFrame.im);
-            //cv::imwrite("right.png",mCurrentFrame.im);
 
-                        // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            mCurrentFrame.SetPose(Tcw2);
-            //mTcwOdom = Tcw2;
-            CreateInitialMap();
+            //cv::line(mInitialFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
+            //cv::line(mCurrentFrame.im, kp1.pt, kp2.pt, cv::Scalar(0, 0, 255));
+            //cv::circle(mInitialFrame.im, kp1.pt, 2, cv::Scalar(0, 255, 0));
+            //cv::circle(mCurrentFrame.im, kp2.pt, 2, cv::Scalar(0, 255, 0));
+
+            // Check parallax between rays
+            cv::Mat xn1 = (cv::Mat_<float>(3, 1) << (kp1.pt.x - cx1) * invfx1, (kp1.pt.y - cy1) * invfy1, 1.0);
+            cv::Mat ray1 = Rwc1 * xn1;
+            cv::Mat xn2 = (cv::Mat_<float>(3, 1) << (kp2.pt.x - cx2) * invfx2, (kp2.pt.y - cy2) * invfy2, 1.0);
+            cv::Mat ray2 = Rwc2 * xn2;
+            const float cosParallaxRays = ray1.dot(ray2) / (cv::norm(ray1) * cv::norm(ray2));
+
+            if (cosParallaxRays < 0 || cosParallaxRays > 0.9998)
+            {
+                mvIniMatches[ikp] = -1;
+                continue;
+            }
+
+            // Linear Triangulation Method
+            cv::Mat A(4, 4, CV_32F);
+            A.row(0) = xn1.at<float>(0) * Tcw1.row(2) - Tcw1.row(0);
+            A.row(1) = xn1.at<float>(1) * Tcw1.row(2) - Tcw1.row(1);
+            A.row(2) = xn2.at<float>(0) * Tcw2.row(2) - Tcw2.row(0);
+            A.row(3) = xn2.at<float>(1) * Tcw2.row(2) - Tcw2.row(1);
+
+            cv::Mat w, u, vt;
+            cv::SVD::compute(A, w, u, vt, cv::SVD::MODIFY_A | cv::SVD::FULL_UV);
+
+            cv::Mat x3D = vt.row(3).t();
+
+            if (x3D.at<float>(3) == 0)
+            {
+                mvIniMatches[ikp] = -1;
+                continue;
+            }
+
+            // Euclidean coordinates
+            x3D = x3D.rowRange(0, 3) / x3D.at<float>(3);
+            cv::Mat x3Dt = x3D.t();
+
+            //Check triangulation in front of cameras
+            float z1 = Rcw1.row(2).dot(x3Dt) + tcw1.at<float>(2);
+            if (z1 <= 0)
+            {
+                mvIniMatches[ikp] = -1;
+                continue;
+            }
+
+            float z2 = Rcw2.row(2).dot(x3Dt) + tcw2.at<float>(2);
+            if (z2 <= 0)
+            {
+                mvIniMatches[ikp] = -1;
+                continue;
+            }
+
+            if (x3Dt.at<float>(2) < 1 && x3Dt.at<float>(2) > 20)
+            {
+                mvIniMatches[ikp] = -1;
+                continue;
+            }
+
+            //cout<<ikp<<":"<<x3Dt<<endl;
+            mvIniP3D[ikp] = cv::Point3f(x3Dt.at<float>(0), x3Dt.at<float>(1), x3Dt.at<float>(2));
+            //printf("init point %5.3f %5.3f %5.3f\n",x3Dt.at<float>(0),x3Dt.at<float>(1),x3Dt.at<float>(2));
+        }
+        //cv::imwrite("left.png",mInitialFrame.im);
+        //cv::imwrite("right.png",mCurrentFrame.im);
+
+        // Set Frame Poses
+        mInitialFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
+        mCurrentFrame.SetPose(Tcw2);
+        CreateInitialMap();
         }
     }
 }

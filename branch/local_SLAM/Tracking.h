@@ -110,7 +110,7 @@ protected:
 
     void UpdateLocalPoints();
 
-
+    void PoseUpdateByOdom(cv::Mat &Tcw, const cv::Vec3f odom);
 
 /*
     // Map initialization for monocular
@@ -171,6 +171,7 @@ protected:
     float mDt;
 
     cv::Mat mTcwOdom;
+    cv::Mat mTcwInit;
 
     cv::Mat mCampose;
 

@@ -386,6 +386,155 @@ int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f
     return nmatches;
 }
 
+int ORBmatcher::SearchForInitializationByProjection(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12)
+{
+    int nmatches = 0;
+     vnMatches12 = vector<int>(F1.mvKeysUn.size(), -1);
+
+    vector<int> rotHist[HISTO_LENGTH];
+    for (int i = 0; i < HISTO_LENGTH; i++)
+        rotHist[i].reserve(500);
+    const float factor = 1.0f / HISTO_LENGTH;
+
+    vector<int> vMatchedDistance(F2.mvKeysUn.size(), INT_MAX);
+    vector<int> vnMatches21(F2.mvKeysUn.size(), -1);
+
+
+    cv::Mat R1w = F1.mTcw.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat t1w = F1.mTcw.rowRange(0,3).col(3).clone();
+    cv::Mat R2w = F2.mTcw.rowRange(0,3).colRange(0,3).clone();
+    cv::Mat t2w = F2.mTcw.rowRange(0,3).col(3).clone();
+
+    cv::Mat R12 = R1w*R2w.t();
+    cv::Mat t12 = -R1w*R2w.t()*t2w+t1w;
+
+
+    cv::Mat t12x = (cv::Mat_<float>(3,3) <<             
+            0,                -t12.at<float>(2),  t12.at<float>(1),
+            t12.at<float>(2),                 0, -t12.at<float>(0),
+           -t12.at<float>(1),  t12.at<float>(0),                0);
+
+
+    const cv::Mat &K1 = F1.mK;
+    const cv::Mat &K2 = F2.mK;
+
+
+    const cv::Mat F12 = K1.t().inv()*t12x*R12*K2.inv();
+
+    for (size_t i1 = 0, iend1 = F1.mvKeysUn.size(); i1 < iend1; i1++)
+    {
+        cv::KeyPoint kp1 = F1.mvKeysUn[i1];
+
+        //Only search the matching for level0
+        //if (kp1.octave > 0)
+        //    continue;
+
+        const float a = kp1.pt.x * F12.at<float>(0, 0) + kp1.pt.y * F12.at<float>(1, 0) + F12.at<float>(2, 0);
+        const float b = kp1.pt.x * F12.at<float>(0, 1) + kp1.pt.y * F12.at<float>(1, 1) + F12.at<float>(2, 1);
+        const float c = kp1.pt.x * F12.at<float>(0, 2) + kp1.pt.y * F12.at<float>(1, 2) + F12.at<float>(2, 2);
+
+        int bestDist = INT_MAX;
+        int bestDist2 = INT_MAX;
+        int bestIdx2 = -1;
+
+        cv::Mat d1 = F1.mDescriptors.row(i1);
+
+        for (size_t i2 = 0, iend2 = F2.mvKeysUn.size(); i2 < iend2; i2++)
+        {
+
+            const cv::KeyPoint &kp2 = F2.mvKeysUn[i2];
+            const float num = a * kp2.pt.x + b * kp2.pt.y + c;
+            const float den = a * a + b * b;
+
+            if (den == 0)
+                continue;
+
+            const float dsqr = num * num / den;
+
+            if (dsqr < 3.84 * F2.mvLevelSigma2[kp2.octave])
+            {
+                const cv::Mat &d2 = F2.mDescriptors.row(i2);
+                const int dist = DescriptorDistance(d1, d2);
+                if (vMatchedDistance[i2] <= dist)
+                    continue;
+
+                if (dist < bestDist)
+                {
+                    bestDist2 = bestDist;
+                    bestDist = dist;
+                    bestIdx2 = i2;
+                }
+                else if (dist < bestDist2)
+                {
+                    bestDist2 = dist;
+                }
+            }
+
+        }
+
+        if (bestDist <= TH_LOW)
+        {
+            if (bestDist < (float)bestDist2 * mfNNratio)
+            {
+                //Make sure this keyPoint not matched with other point.
+                if (vnMatches21[bestIdx2] >= 0)
+                {
+                    vnMatches12[vnMatches21[bestIdx2]] = -1;
+                    nmatches--;
+                }
+                vnMatches12[i1] = bestIdx2;
+                vnMatches21[bestIdx2] = i1;
+                vMatchedDistance[bestIdx2] = bestDist;
+                nmatches++;
+
+                if (mbCheckOrientation)
+                {
+                    float rot = F1.mvKeysUn[i1].angle - F2.mvKeysUn[bestIdx2].angle;
+                    if (rot < 0.0)
+                        rot += 360.0f;
+                    int bin = round(rot * factor);
+                    if (bin == HISTO_LENGTH)
+                        bin = 0;
+                    assert(bin >= 0 && bin < HISTO_LENGTH);
+                    rotHist[bin].push_back(i1);
+                }
+            }
+        }
+    }
+
+    if (mbCheckOrientation)
+    {
+        int ind1 = -1;
+        int ind2 = -1;
+        int ind3 = -1;
+
+        ComputeThreeMaxima(rotHist, HISTO_LENGTH, ind1, ind2, ind3);
+
+        for (int i = 0; i < HISTO_LENGTH; i++)
+        {
+            if (i == ind1 || i == ind2 || i == ind3)
+                continue;
+            for (size_t j = 0, jend = rotHist[i].size(); j < jend; j++)
+            {
+                int idx1 = rotHist[i][j];
+                if (vnMatches12[idx1] >= 0)
+                {
+                    vnMatches12[idx1] = -1;
+                    nmatches--;
+                }
+            }
+        }
+    }
+
+    //Update the location of matched points, in order to seek matched points for subsequent frame easily.
+    for (size_t i1 = 0, iend1 = vnMatches12.size(); i1 < iend1; i1++)
+        if (vnMatches12[i1] >= 0)
+            vbPrevMatched[i1] = F2.mvKeysUn[vnMatches12[i1]].pt;
+
+    return nmatches;
+}
+
+
 int ORBmatcher::SearchByProjection(Frame &F, const vector<MapPoint *> &vpMapPoints, const float th)
 {
     int nmatches = 0;

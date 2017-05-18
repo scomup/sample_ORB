@@ -356,9 +356,9 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     int n;
     PoseSolver solver(pFrame);
 
-    printf("Solve300\n");
+    //printf("Solve300\n");
     n = solver.Solve(80);
-    printf("Solve100\n");
+    //printf("Solve100\n");
     n = solver.Solve(30);
     return n;
 }

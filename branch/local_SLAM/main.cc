@@ -21,7 +21,7 @@
 
 
 const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/Settings.yaml";
-
+//const char strSettingsFile[] = "/home/liu/workspace/sample_ORB/config/zed1080tovga.yaml";
 using namespace std;
 using namespace sample_ORB;
 
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 
     ros::NodeHandle nodeHandler;
     ros::Subscriber imgsub = nodeHandler.subscribe("stereo/left/image_raw", 1, &localSlamRunner::GrabImage, &lsr);
-    ros::Subscriber odmsub = nodeHandler.subscribe("/Rulo/odom", 1, &localSlamRunner::GrabOdom, &lsr);
+    ros::Subscriber odmsub = nodeHandler.subscribe("Rulo/odom", 1, &localSlamRunner::GrabOdom, &lsr);
 
     ros::spin();
 
