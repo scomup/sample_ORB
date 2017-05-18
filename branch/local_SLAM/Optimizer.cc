@@ -87,8 +87,8 @@ class PoseSolver
 
 PoseSolver::PoseSolver(Frame *pFrame) : mpFrame(pFrame)
 {
-     mKV = 100;
-     mKYaw = 50;       
+     mKV = 50;
+     mKYaw = 10;       
 }
 
 Eigen::Matrix<double, 5, 3> PoseSolver::Jacobiani(cv::Mat point)
@@ -250,7 +250,6 @@ int PoseSolver::Solve(float maxe)
                 Eigen::Matrix<double, 5, 1> Ei = Errori(pMP->GetWorldPos(), kpUn.pt.x, kpUn.pt.y);
                 //double E2 = Ei.transpose() * Ei;
                 double E2 = Ei(0,0) * Ei(0,0) + Ei(1,0) * Ei(1,0);
-                //printf("E2:%f\n",E2);
                 if(E2 > maxe){
                     mpFrame->mvbOutlier[i] = true;
                     continue;
@@ -334,16 +333,16 @@ void PoseSolver::ReadDataFromFrame()
     //mDxw    = mpFrame->mOdom[0];
     //mDyw    = mpFrame->mOdom[1];
     //mDyaww  = mpFrame->mOdom[2];
-    mMDxw   = mpFrame->mOdom[0];
-    mMDyw   = mpFrame->mOdom[1];
-    mMDyaww = mpFrame->mOdom[2];
+    //mMDxw   = mpFrame->mOdom[0];
+    //mMDyw   = mpFrame->mOdom[1];
+    //mMDyaww = mpFrame->mOdom[2];
     //If motion mode is used, set mDxw/mDyw/mDyaww and mMDxw/mMDyw/mMDyaww to zero
     mDxw    = 0;
     mDyw    = 0;
     mDyaww  = 0;
-    //mMDxw   = 0;
-    //mMDyw   = 0;
-    //mMDyaww = 0;
+    mMDxw   = 0;
+    mMDyw   = 0;
+    mMDyaww = 0;
 }
 }
 
@@ -358,9 +357,9 @@ int Optimizer::PoseOptimization(Frame *pFrame)
     PoseSolver solver(pFrame);
 
     printf("Solve300\n");
-    n = solver.Solve(100);
+    n = solver.Solve(80);
     printf("Solve100\n");
-    n = solver.Solve(50);
+    n = solver.Solve(30);
     return n;
 }
 

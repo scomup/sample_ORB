@@ -389,7 +389,7 @@ bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
 
-    /*cv::Mat Tcw = mLastFrame.mTcw;
+    cv::Mat Tcw = mLastFrame.mTcw;
     
     cv::Mat DRcw = Converter::computeMatrixFromAngles(0, 0, -mCurrentFrame.mOdom[2]);
     cv::Mat RcwOld = Tcw.rowRange(0,3).colRange(0,3);
@@ -401,8 +401,8 @@ bool Tracking::TrackWithMotionModel()
     tcw = -Rcw*twc;
     tcw.copyTo(Tcw.rowRange(0,3).col(3));
     Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-    */
-    mCurrentFrame.SetPose(mLastFrame.mTcw);
+    
+    mCurrentFrame.SetPose(Tcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 

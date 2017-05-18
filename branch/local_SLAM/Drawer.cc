@@ -272,7 +272,7 @@ void Drawer::SetDrawer(cv::Mat& CameraPose, cv::Mat& CameraPoseOdom,std::list<Ke
 
 }
 
-void Drawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, cv::Mat CameraPose)
+void Drawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, cv::Mat &CameraPose)
 {
     if(!CameraPose.empty())
     {

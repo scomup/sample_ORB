@@ -32,7 +32,7 @@ protected:
     void DrawMapPoints();
     void DrawPath();
     void DrawCurrentCamera(pangolin::OpenGlMatrix &Twc, cv::Scalar color);
-    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, cv::Mat CameraPose);
+    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M, cv::Mat &CameraPose);
 
 private:
     std::list<KeyFrame*> mlpLocalKeyFrames;
