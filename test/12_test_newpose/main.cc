@@ -9,7 +9,9 @@
 #include "KeyFrame.h"
 #include "MapPoint.h"
 #include "Map.h"
-#include "PoseSolver.h"
+#include "CeresPoseSolver.h"
+#include "SamplePoseSolver.h"
+#include "G2OPoseSolver.h"
 
 
 #include <iostream>
@@ -181,8 +183,21 @@ int main()
     //==============================================================
     // Compute the pose of new frame
     //==============================================================
-    PoseSolver solver(&frame3);
-    solver.Solve();
+    CeresPoseSolver  ceressolver(&frame3);
+    SamplePoseSolver samplesolver(&frame3);
+    G2OPoseSolver    g2osolver(&frame3);
+
+
+    auto start = std::chrono::system_clock::now(); 
+    ceressolver.Solve();
+    //samplesolver.Solve(3000);
+    //g2osolver.Solve();
+
+    auto end = std::chrono::system_clock::now();
+    auto dur = end - start;
+    auto msec = std::chrono::duration_cast<std::chrono::nanoseconds>(dur).count();
+    std::cout << msec << " nanoseconds \n";
+
 
     //==============================================================
     // Draw map

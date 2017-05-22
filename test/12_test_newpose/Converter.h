@@ -20,6 +20,8 @@
 
 #ifndef CONVERTER_H
 #define CONVERTER_H
+#include"../../Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
+#include"../../Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
 #include<opencv2/core/core.hpp>
 
@@ -31,6 +33,11 @@ namespace sample_ORB
 class Converter
 {
 public:
+
+
+    static g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
+    static cv::Mat toCvMat(const g2o::SE3Quat &SE3);
+
     static std::vector<cv::Mat> toDescriptorVector(const cv::Mat &Descriptors);
 
     static cv::Mat toCvMat(const Eigen::Matrix<double,4,4> &m);
